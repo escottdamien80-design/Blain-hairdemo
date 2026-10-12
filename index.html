@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blain Hair – Barber Shop</title>
+  <meta name="description" content="Blain Hair – sharp cuts, clean lines. Book your barber online.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <h1 class="logo">Blain Hair</h1>
+      <p class="tagline">Sharp cuts. Clean lines. No waiting around.</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="booking" aria-labelledby="booking-title">
+      <h2 id="booking-title" class="visually-hidden">Book an appointment</h2>
+
+      <div class="step">
+        <h3><span class="step-num">1</span> Choose your barber</h3>
+        <div id="barbers" class="barbers" role="radiogroup" aria-label="Barbers"></div>
+      </div>
+
+      <div id="slots-step" class="step" hidden>
+        <div class="step-head">
+          <h3><span class="step-num">2</span> Pick a time</h3>
+          <button id="next-available" class="btn btn-accent" type="button">Next available</button>
+        </div>
+        <div id="slots" class="slots"></div>
+      </div>
+
+      <div id="confirmation" class="confirmation" role="status" aria-live="polite" hidden></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Blain Hair · Demo site – no real bookings are made.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
