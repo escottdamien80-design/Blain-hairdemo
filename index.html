@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blain Hair – Barber Shop</title>
+  <meta name="description" content="Blain Hair – sharp cuts, clean lines. Book your barber online.">
+  <meta name="theme-color" content="#121111">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@500;600&family=Spectral:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#top" aria-label="Blain Hair home"><img src="logo.png" alt="Blain" width="770" height="176"></a>
+      <a class="btn btn-light btn-sm" href="#booking">Book now</a>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="container">
+      <img class="hero-logo" src="logo.png" alt="Blain Hair" width="770" height="176">
+      <h1>Sharp cuts.<br>Clean lines.</h1>
+      <p class="tagline">Book your appointment in seconds.</p>
+      <a class="btn btn-light" href="#booking">Choose your barber</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="booking container" id="booking" aria-labelledby="booking-title">
+      <h2 id="booking-title" class="section-title">Book your cut</h2>
+
+      <div class="step">
+        <h3><span class="step-num">1</span> Choose your barber</h3>
+        <div id="barbers" class="barbers" role="radiogroup" aria-label="Barbers"></div>
+      </div>
+
+      <div id="slots-step" class="step" hidden>
+        <div class="step-head">
+          <h3><span class="step-num">2</span> Pick a time</h3>
+          <button id="next-available" class="btn btn-light btn-sm" type="button">Next available</button>
+        </div>
+        <div id="slots" class="slots"></div>
+      </div>
+
+      <div id="confirmation" class="confirmation" role="status" aria-live="polite" hidden></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>&copy; <span id="year"></span> Blain Hair · Demo site – no real bookings are made.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
