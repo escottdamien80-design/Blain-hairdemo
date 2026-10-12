@@ -4,9 +4,9 @@
 // Each slot: day offset from today, 24h time, price in £, and whether it's already booked.
 const BARBERS = [
   {
-    id: "marcus",
-    name: "Marcus",
-    role: "Senior barber · Fades & beards",
+    id: "matty",
+    name: "Matty",
+    role: "Barber",
     slots: [
       { day: 0, time: "10:00", price: 28, booked: true },
       { day: 0, time: "11:00", price: 28, booked: true },
@@ -23,9 +23,9 @@ const BARBERS = [
     ],
   },
   {
-    id: "jay",
-    name: "Jay",
-    role: "Stylist · Classic cuts & styling",
+    id: "alfie",
+    name: "Alfie",
+    role: "Barber",
     slots: [
       { day: 0, time: "09:00", price: 25, booked: true },
       { day: 0, time: "12:30", price: 25, booked: false },
@@ -177,7 +177,7 @@ function book(slot) {
 
   const box = $("confirmation");
   box.innerHTML =
-    `<h3>✓ Booking confirmed</h3>` +
+    `<h3>Booking confirmed</h3>` +
     `<p>You're booked with <strong>${selected.name}</strong> on ` +
     `<strong>${fullDayLabel(slot)}</strong>. Price: <strong>£${slot.price}</strong> (pay in shop).</p>`;
   box.hidden = false;
