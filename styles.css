@@ -60,16 +60,8 @@ body {
   align-items: center;
   justify-content: space-between;
 }
-.brand {
-  font-family: var(--font-brand);
-  font-weight: 600;
-  font-size: 1.5rem;
-  letter-spacing: 0.4em;
-  text-transform: uppercase;
-  color: var(--ink);
-  text-decoration: none;
-  margin-right: -0.4em;
-}
+.brand { display: block; line-height: 0; }
+.brand img { height: 22px; width: auto; }
 
 /* ---------- Hero ---------- */
 .hero {
@@ -79,13 +71,11 @@ body {
   text-align: center;
   padding: 88px 0 96px;
 }
-.eyebrow {
-  margin: 0 0 18px;
-  font-family: var(--font-brand);
-  letter-spacing: 0.5em;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  color: var(--muted);
+.hero-logo {
+  display: block;
+  width: min(300px, 70%);
+  height: auto;
+  margin: 0 auto 44px;
 }
 .hero h1 {
   margin: 0;
@@ -307,7 +297,7 @@ body {
 .footer p { margin: 0; }
 
 @media (max-width: 460px) {
-  .brand { font-size: 1.2rem; letter-spacing: 0.3em; }
+  .brand img { height: 18px; }
   .hero { padding: 64px 0 72px; }
   .booking { padding-top: 48px; }
   .step { padding: 18px; }
