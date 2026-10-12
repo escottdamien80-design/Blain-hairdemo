@@ -76,10 +76,11 @@ let selected = null;
 
 function renderBarbers() {
   const wrap = $("barbers");
-  BARBERS.forEach((b) => {
+  BARBERS.forEach((b, i) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "barber";
+    btn.className = "barber reveal";
+    btn.style.setProperty("--d", `${0.25 + i * 0.12}s`);
     btn.id = `barber-${b.id}`;
     btn.setAttribute("role", "radio");
     btn.setAttribute("aria-checked", "false");
@@ -89,6 +90,7 @@ function renderBarbers() {
       `<span class="barber-role">${b.role}</span>`;
     btn.addEventListener("click", () => selectBarber(b));
     wrap.appendChild(btn);
+    observe(btn);
   });
 }
 
@@ -122,7 +124,7 @@ function renderSlots() {
     selected.slots
       .filter((s) => s.day === day)
       .sort((a, b) => a.time.localeCompare(b.time))
-      .forEach((slot) => list.appendChild(slotEl(slot)));
+      .forEach((slot, i) => list.appendChild(slotEl(slot, i)));
 
     section.append(title, list);
     container.appendChild(section);
@@ -131,10 +133,11 @@ function renderSlots() {
   $("next-available").disabled = !nextAvailable(selected);
 }
 
-function slotEl(slot) {
+function slotEl(slot, i = 0) {
   const free = isAvailable(slot);
   const el = document.createElement("div");
   el.className = "slot" + (free ? "" : " taken");
+  el.style.setProperty("--i", Math.min(i, 10));
   el.dataset.day = slot.day;
   el.dataset.time = slot.time;
   el.innerHTML =
@@ -146,7 +149,7 @@ function slotEl(slot) {
   btn.className = "slot-btn";
   btn.textContent = free ? "Book" : "Unavailable";
   btn.disabled = !free;
-  btn.addEventListener("click", () => book(slot));
+  btn.addEventListener("click", () => selectSlot(slot, el));
   el.appendChild(btn);
   return el;
 }
@@ -171,20 +174,59 @@ function jumpToNext() {
   el.querySelector(".slot-btn").focus({ preventScroll: true });
 }
 
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let booking = false;
+
+// Animate the chosen slot first, then confirm the booking
+function selectSlot(slot, el) {
+  if (booking) return;
+  booking = true;
+  document.querySelectorAll(".slot.highlight").forEach((n) => n.classList.remove("highlight"));
+  el.classList.add("selected");
+  el.querySelector(".slot-btn").textContent = "Booked ✓";
+  document.querySelectorAll(".slot-btn").forEach((b) => (b.disabled = true));
+  setTimeout(() => { booking = false; book(slot); }, reduceMotion ? 0 : 650);
+}
+
 function book(slot) {
   slot.booked = true;
   renderSlots();
 
   const box = $("confirmation");
   box.innerHTML =
-    `<h3>Booking confirmed</h3>` +
+    `<svg class="tick" viewBox="0 0 56 56" aria-hidden="true">` +
+    `<circle cx="28" cy="28" r="24"/><path d="M17 29l8 8 14-16"/></svg>` +
+    `<div><h3>Booking confirmed</h3>` +
     `<p>You're booked with <strong>${selected.name}</strong> on ` +
-    `<strong>${fullDayLabel(slot)}</strong>. Price: <strong>£${slot.price}</strong> (pay in shop).</p>`;
+    `<strong>${fullDayLabel(slot)}</strong>. Price: <strong>£${slot.price}</strong> (pay in shop).</p></div>`;
   box.hidden = false;
+  // restart the entrance + tick animations on repeat bookings
+  box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
   box.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// ---- Scroll reveal ----------------------------------------------------------
+const revealObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        const el = entry.target;
+        revealObserver.unobserve(el);
+        el.classList.add("in");
+        // drop the reveal styles once finished so hover transitions stay snappy
+        const delay = parseFloat(el.style.getPropertyValue("--d")) || 0;
+        setTimeout(() => el.classList.remove("reveal", "in"), (delay + 1) * 1000 + 100);
+      });
+    }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" })
+  : null;
+
+function observe(el) {
+  if (revealObserver) revealObserver.observe(el);
+  else el.classList.remove("reveal");
 }
 
 // ---- Init -------------------------------------------------------------------
 $("year").textContent = new Date().getFullYear();
 $("next-available").addEventListener("click", jumpToNext);
 renderBarbers();
+document.querySelectorAll(".reveal").forEach((el) => { if (!el.classList.contains("barber")) observe(el); });

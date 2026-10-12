@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@500;600&family=Spectral:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>document.documentElement.classList.add("js")</script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -30,9 +31,9 @@
 
   <main>
     <section class="booking container" id="booking" aria-labelledby="booking-title">
-      <h2 id="booking-title" class="section-title">Book your cut</h2>
+      <h2 id="booking-title" class="section-title reveal">Book your cut</h2>
 
-      <div class="step">
+      <div class="step reveal" style="--d:.1s">
         <h3><span class="step-num">1</span> Choose your barber</h3>
         <div id="barbers" class="barbers" role="radiogroup" aria-label="Barbers"></div>
       </div>
@@ -49,7 +50,7 @@
     </section>
   </main>
 
-  <footer class="footer">
+  <footer class="footer reveal">
     <p>&copy; <span id="year"></span> Blain Hair · Demo site – no real bookings are made.</p>
   </footer>
 
