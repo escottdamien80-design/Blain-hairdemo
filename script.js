@@ -1,7 +1,23 @@
 "use strict";
 
-// ---- Dummy data (no backend) ----------------------------------------------
-// Each slot: day offset from today, 24h time, price in £, and whether it's already booked.
+// ---- Supabase config --------------------------------------------------------
+// Paste your Project URL and anon public key (Supabase → Project Settings → API).
+// Leave both empty to run in demo mode (bookings are kept in memory only).
+// The anon key is meant to be public; access is controlled by the row-level
+// security policies in supabase/setup.sql.
+const SUPABASE_URL = "https://mddhykzuxrywhtmjwajy.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZGh5a3p1eHJ5d2h0bWp3YWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MjAyMTQsImV4cCI6MjEwNzQ5NjIxNH0.kPm-ifCf1Pdg35czMDUPqEwqnMLKfKdZmAe88VgIqVI";
+const SERVICE = "Haircut"; // saved in the `service` column
+
+const configured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const sb = configured && window.supabase
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+const live = Boolean(sb);
+
+// ---- Shop schedule ------------------------------------------------------------
+// Each slot: day offset from today, 24h time, price in £.
+// `booked` only matters in demo mode; with Supabase it comes from the database.
 const BARBERS = [
   {
     id: "matty",
@@ -72,7 +88,50 @@ function fullDayLabel(slot) {
 }
 
 // ---- State & rendering -------------------------------------------------------
-let selected = null;
+let selected = null; // chosen barber
+let pending = null;  // { slot, el } while the customer is filling in their details
+
+// Live mode: forget the dummy "booked" flags; the database is the source of truth
+if (live) BARBERS.forEach((b) => b.slots.forEach((s) => (s.booked = false)));
+
+function esc(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function showNotice(msg) {
+  const n = $("notice");
+  n.textContent = msg;
+  n.hidden = false;
+}
+function hideNotice() { $("notice").hidden = true; }
+
+// ---- Availability from Supabase ---------------------------------------------
+// Reads the `taken_slots` view (barber + appointment_time only) so customer
+// names and phone numbers are never exposed to the browser.
+async function refreshTaken() {
+  if (!live) return true;
+  const { data, error } = await sb
+    .from("taken_slots")
+    .select("barber, appointment_time")
+    .gte("appointment_time", new Date().toISOString());
+  if (error) {
+    console.error("Could not load bookings:", error);
+    showNotice("Couldn't check live availability. A slot that's already taken will be rejected when you confirm.");
+    return false;
+  }
+  hideNotice();
+  const taken = new Set(
+    data.map((r) => `${String(r.barber).toLowerCase()}|${new Date(r.appointment_time).getTime()}`)
+  );
+  BARBERS.forEach((b) =>
+    b.slots.forEach((s) => {
+      s.booked = taken.has(`${b.name.toLowerCase()}|${slotDate(s).getTime()}`);
+    })
+  );
+  return true;
+}
 
 function renderBarbers() {
   const wrap = $("barbers");
@@ -94,17 +153,22 @@ function renderBarbers() {
   });
 }
 
-function selectBarber(barber) {
+async function selectBarber(barber) {
   selected = barber;
+  clearPending();
   document.querySelectorAll(".barber").forEach((el) =>
     el.setAttribute("aria-checked", String(el.id === `barber-${barber.id}`))
   );
   $("confirmation").hidden = true;
-  renderSlots();
+
   const step = $("slots-step");
   const wasHidden = step.hidden;
   step.hidden = false;
+  if (live) $("slots").innerHTML = '<p class="loading">Checking availability…</p>';
   if (wasHidden) step.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  await refreshTaken();
+  if (selected === barber) renderSlots(); // ignore if they switched barber meanwhile
 }
 
 function renderSlots() {
@@ -151,6 +215,8 @@ function slotEl(slot, i = 0) {
   btn.disabled = !free;
   btn.addEventListener("click", () => selectSlot(slot, el));
   el.appendChild(btn);
+
+  if (pending && pending.slot === slot && free) markSelected(el);
   return el;
 }
 
@@ -174,22 +240,101 @@ function jumpToNext() {
   el.querySelector(".slot-btn").focus({ preventScroll: true });
 }
 
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-let booking = false;
-
-// Animate the chosen slot first, then confirm the booking
-function selectSlot(slot, el) {
-  if (booking) return;
-  booking = true;
-  document.querySelectorAll(".slot.highlight").forEach((n) => n.classList.remove("highlight"));
+// ---- Choosing a slot and booking it -------------------------------------------
+function markSelected(el) {
   el.classList.add("selected");
-  el.querySelector(".slot-btn").textContent = "Booked ✓";
-  document.querySelectorAll(".slot-btn").forEach((b) => (b.disabled = true));
-  setTimeout(() => { booking = false; book(slot); }, reduceMotion ? 0 : 650);
+  el.querySelector(".slot-btn").textContent = "Selected ✓";
 }
 
-function book(slot) {
+function selectSlot(slot, el) {
+  document.querySelectorAll(".slot.highlight").forEach((n) => n.classList.remove("highlight"));
+  document.querySelectorAll(".slot.selected").forEach((n) => {
+    n.classList.remove("selected");
+    n.querySelector(".slot-btn").textContent = "Book";
+  });
+  pending = { slot, el };
+  markSelected(el);
+  $("confirmation").hidden = true;
+  showDetails(slot);
+}
+
+function showDetails(slot) {
+  $("details-summary").textContent =
+    `${selected.name} · ${fullDayLabel(slot)} · £${slot.price}`;
+  $("form-error").hidden = true;
+  const step = $("details-step");
+  step.hidden = false;
+  step.style.animation = "none"; void step.offsetWidth; step.style.animation = "";
+  step.scrollIntoView({ behavior: "smooth", block: "center" });
+  $("customer-name").focus({ preventScroll: true });
+}
+
+function clearPending() {
+  pending = null;
+  $("details-step").hidden = true;
+  $("details-form").reset();
+  document.querySelectorAll(".slot.selected").forEach((n) => {
+    n.classList.remove("selected");
+    n.querySelector(".slot-btn").textContent = "Book";
+  });
+}
+
+function formError(msg) {
+  const e = $("form-error");
+  e.textContent = msg;
+  e.hidden = false;
+}
+
+async function submitBooking(event) {
+  event.preventDefault();
+  if (!pending) return;
+  const name = $("customer-name").value.trim();
+  const phone = $("customer-phone").value.trim();
+
+  if (name.length < 2) return formError("Please enter your name.");
+  if (!/^\+?[\d\s()-]{7,20}$/.test(phone)) return formError("Please enter a valid phone number.");
+  if (configured && !live) return formError("Booking is unavailable right now. Please try again later.");
+
+  const { slot } = pending;
+  const submit = $("confirm-booking");
+  submit.disabled = true;
+  submit.textContent = "Saving…";
+  $("form-error").hidden = true;
+
+  try {
+    if (live) {
+      const { error } = await sb.from("bookings").insert({
+        barber: selected.name,
+        customer_name: name,
+        service: SERVICE,
+        appointment_time: slotDate(slot).toISOString(),
+        customer_phone: phone,
+        status: "confirmed",
+      });
+      if (error) {
+        // 23505 = unique violation: someone else booked this barber and time first
+        if (error.code === "23505") {
+          clearPending();
+          await refreshTaken();
+          renderSlots();
+          showNotice("Sorry, that time was just taken. Please choose another slot.");
+          return;
+        }
+        console.error("Booking failed:", error);
+        return formError("Sorry, we couldn't save your booking. Please try again.");
+      }
+    }
+    book(slot, name);
+  } finally {
+    submit.disabled = false;
+    submit.textContent = "Confirm booking";
+  }
+}
+
+function book(slot, name) {
   slot.booked = true;
+  hideNotice();
+  clearPending();
   renderSlots();
 
   const box = $("confirmation");
@@ -197,7 +342,7 @@ function book(slot) {
     `<svg class="tick" viewBox="0 0 56 56" aria-hidden="true">` +
     `<circle cx="28" cy="28" r="24"/><path d="M17 29l8 8 14-16"/></svg>` +
     `<div><h3>Booking confirmed</h3>` +
-    `<p>You're booked with <strong>${selected.name}</strong> on ` +
+    `<p>Thanks ${esc(name)}, you're booked with <strong>${selected.name}</strong> on ` +
     `<strong>${fullDayLabel(slot)}</strong>. Price: <strong>£${slot.price}</strong> (pay in shop).</p></div>`;
   box.hidden = false;
   // restart the entrance + tick animations on repeat bookings
@@ -228,5 +373,13 @@ function observe(el) {
 // ---- Init -------------------------------------------------------------------
 $("year").textContent = new Date().getFullYear();
 $("next-available").addEventListener("click", jumpToNext);
+$("details-form").addEventListener("submit", submitBooking);
+$("cancel-booking").addEventListener("click", clearPending);
 renderBarbers();
 document.querySelectorAll(".reveal").forEach((el) => { if (!el.classList.contains("barber")) observe(el); });
+
+if (configured && !live) {
+  showNotice("Booking is unavailable right now (couldn't load the booking service).");
+} else {
+  refreshTaken(); // warm up so the first barber click is instant
+}
