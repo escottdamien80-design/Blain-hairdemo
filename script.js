@@ -5,8 +5,8 @@
 // Leave both empty to run in demo mode (bookings are kept in memory only).
 // The anon key is meant to be public; access is controlled by the row-level
 // security policies in supabase/setup.sql.
-const SUPABASE_URL = "";
-const SUPABASE_ANON_KEY = "";
+const SUPABASE_URL = "https://mddhykzuxrywhtmjwajy.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZGh5a3p1eHJ5d2h0bWp3YWp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MjAyMTQsImV4cCI6MjEwNzQ5NjIxNH0.kPm-ifCf1Pdg35czMDUPqEwqnMLKfKdZmAe88VgIqVI";
 const SERVICE = "Haircut"; // saved in the `service` column
 
 const configured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
