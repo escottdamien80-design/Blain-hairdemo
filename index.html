@@ -33,6 +33,8 @@
     <section class="booking container" id="booking" aria-labelledby="booking-title">
       <h2 id="booking-title" class="section-title reveal">Book your cut</h2>
 
+      <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+
       <div class="step reveal" style="--d:.1s">
         <h3><span class="step-num">1</span> Choose your barber</h3>
         <div id="barbers" class="barbers" role="radiogroup" aria-label="Barbers"></div>
@@ -46,6 +48,26 @@
         <div id="slots" class="slots"></div>
       </div>
 
+      <div id="details-step" class="step" hidden>
+        <h3><span class="step-num">3</span> Your details</h3>
+        <p id="details-summary" class="summary"></p>
+        <form id="details-form" novalidate>
+          <div class="fields">
+            <label>Name
+              <input id="customer-name" name="name" type="text" autocomplete="name" maxlength="80" required>
+            </label>
+            <label>Phone
+              <input id="customer-phone" name="phone" type="tel" autocomplete="tel" maxlength="20" required>
+            </label>
+          </div>
+          <p id="form-error" class="form-error" role="alert" hidden></p>
+          <div class="actions">
+            <button id="confirm-booking" class="btn btn-light" type="submit">Confirm booking</button>
+            <button id="cancel-booking" class="btn btn-ghost" type="button">Cancel</button>
+          </div>
+        </form>
+      </div>
+
       <div id="confirmation" class="confirmation" role="status" aria-live="polite" hidden></div>
     </section>
   </main>
@@ -54,6 +76,7 @@
     <p>&copy; <span id="year"></span> Blain Hair · Demo site – no real bookings are made.</p>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
