@@ -370,6 +370,65 @@ function observe(el) {
   else el.classList.remove("reveal");
 }
 
+// ---- Stats counters ---------------------------------------------------------
+// Count up from 0 the first time the section scrolls into view, then never again.
+(function () {
+  const nums = document.querySelectorAll(".stat-num");
+  const section = document.querySelector(".stats");
+  if (!nums.length || !section) return;
+
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fmt = (el, v) => {
+    const dec = Number(el.dataset.decimals || 0);
+    const n = v.toLocaleString("en-GB", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    return el.dataset.suffix ? `${n}<span class="sfx">${el.dataset.suffix}</span>` : n;
+  };
+  const run = (el) => {
+    const target = Number(el.dataset.count);
+    const start = performance.now();
+    const duration = 1800;
+    const tick = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      el.innerHTML = fmt(el, target * (1 - Math.pow(1 - t, 3))); // ease-out
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
+  // No observer or reduced motion: leave the final values from the HTML in place
+  if (reduce || !("IntersectionObserver" in window)) return;
+
+  nums.forEach((el) => (el.innerHTML = fmt(el, 0)));
+  const io = new IntersectionObserver((entries) => {
+    if (!entries[0].isIntersecting) return;
+    io.disconnect(); // only animate once
+    nums.forEach(run);
+  }, { threshold: 0.4 });
+  io.observe(section);
+})();
+
+// ---- Sticky "Book now" button -----------------------------------------------
+// Visible once the hero has scrolled away, hidden while the booking section is on screen.
+(function () {
+  const btn = $("sticky-book");
+  const hero = $("top");
+  const booking = $("booking");
+  if (!btn || !hero || !booking || !("IntersectionObserver" in window)) return;
+
+  let heroPast = false;
+  let bookingOnScreen = false;
+  const update = () => btn.classList.toggle("show", heroPast && !bookingOnScreen);
+
+  new IntersectionObserver(([e]) => {
+    heroPast = !e.isIntersecting && e.boundingClientRect.top < 0;
+    update();
+  }).observe(hero);
+  new IntersectionObserver(([e]) => {
+    bookingOnScreen = e.isIntersecting;
+    update();
+  }).observe(booking);
+})();
+
 // ---- Init -------------------------------------------------------------------
 $("year").textContent = new Date().getFullYear();
 $("next-available").addEventListener("click", jumpToNext);
