@@ -8,6 +8,8 @@
   --glass: rgba(255, 255, 255, 0.045);
   --glass-strong: rgba(255, 255, 255, 0.075);
   --radius: 20px;
+  /* slightly darker and desaturated photos to sit on the near-black theme */
+  --photo-filter: saturate(0.6) brightness(0.8) contrast(1.05);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   --font-display: "Bebas Neue", Impact, "Arial Narrow", sans-serif;
@@ -71,11 +73,38 @@ body {
 
 /* ---------- Hero ---------- */
 .hero {
-  background:
-    radial-gradient(ellipse 70% 60% at 50% 0%, rgba(255, 255, 255, 0.08), transparent 70%),
-    var(--hero);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--hero);
   text-align: center;
   padding: 128px 0 144px;
+}
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 40%;
+  filter: var(--photo-filter);
+  transform-origin: 50% 40%;
+  animation: slow-zoom 20s ease-out both;
+}
+/* dark overlay keeps the logo and text readable over the bright ceiling */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 65% 60% at 50% 48%, rgba(14, 13, 13, 0.5), transparent),
+    linear-gradient(rgba(14, 13, 13, 0.4), rgba(14, 13, 13, 0.55) 70%, var(--bg));
+}
+@keyframes slow-zoom {
+  from { transform: scale(1); }
+  to   { transform: scale(1.1); }
 }
 .hero-logo {
   display: block;
@@ -182,6 +211,39 @@ body {
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* ---------- Gallery ---------- */
+.gallery {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 96px 20px 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.gallery figure {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: #1a1817;
+  aspect-ratio: 4 / 5;
+}
+.gallery img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: var(--photo-filter);
+  transition: transform 1.2s var(--ease);
+}
+@media (hover: hover) {
+  .gallery figure:hover img { transform: scale(1.03); }
+}
+@media (max-width: 767px) {
+  .gallery { grid-template-columns: 1fr; gap: 16px; padding-top: 64px; }
+  .gallery figure { border-radius: 20px; }
 }
 
 /* ---------- Sticky "Book now" ---------- */
