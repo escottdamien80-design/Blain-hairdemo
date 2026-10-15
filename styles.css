@@ -144,6 +144,79 @@ body {
   .btn-light:active:not(:disabled) { transform: translateY(-1px) scale(0.98); }
 }
 
+/* ---------- Stats ---------- */
+.stats {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 96px 20px 0;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  text-align: center;
+  padding: 44px 16px;
+  background: var(--glass);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+.stat { min-width: 0; }
+.stat + .stat { border-left: 1px solid var(--line); }
+.stat-num {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(2.1rem, 9vw, 5rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.sfx { font-size: 0.7em; margin-left: 0.04em; vertical-align: 0.14em; }
+.stat-label {
+  display: block;
+  margin-top: 10px;
+  font-family: var(--font-brand);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------- Sticky "Book now" ---------- */
+.sticky-book {
+  position: fixed;
+  z-index: 20;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: block;
+  text-align: center;
+  padding: 16px 24px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.25);
+  /* hidden state: also removed from tab order via visibility */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(20px);
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease),
+              visibility 0s linear 0.4s, background 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+.sticky-book.show {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+@media (min-width: 768px) {
+  .sticky-book {
+    left: auto;
+    right: 32px;
+    bottom: 32px;
+    padding: 16px 34px;
+  }
+}
+
 /* ---------- Booking ---------- */
 .booking {
   position: relative;
@@ -482,6 +555,10 @@ body {
   .avatar { width: 52px; height: 52px; margin-bottom: 16px; }
   .slot-list { grid-template-columns: 1fr 1fr; gap: 12px; }
   .step-head .btn { width: 100%; }
+  .stats { padding-top: 64px; }
+  .stats-grid { padding: 32px 8px; gap: 8px; border-radius: 22px; }
+  .stat-label { font-size: 0.62rem; letter-spacing: 0.12em; }
+  .footer { padding-bottom: 96px; }
   .fields { grid-template-columns: 1fr; }
   .actions .btn { flex: 1; }
   .confirmation { flex-direction: column; gap: 16px; padding: 26px 22px; border-radius: 22px; }

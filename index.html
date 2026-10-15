@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Blain Hair – Barber Shop</title>
   <meta name="description" content="Blain Hair – sharp cuts, clean lines. Book your barber online.">
   <meta name="theme-color" content="#121111">
@@ -30,6 +30,26 @@
   </header>
 
   <main>
+    <section class="stats" aria-label="Blain Hair in numbers">
+      <div class="stats-grid">
+        <div class="stat reveal" style="--d:0s">
+          <span class="stat-num" data-count="2000" data-suffix="+" aria-hidden="true">2,000<span class="sfx">+</span></span>
+          <span class="visually-hidden">2,000+</span>
+          <span class="stat-label">Haircuts</span>
+        </div>
+        <div class="stat reveal" style="--d:.12s">
+          <span class="stat-num" data-count="5" data-decimals="1" data-suffix="★" aria-hidden="true">5.0<span class="sfx">★</span></span>
+          <span class="visually-hidden">5.0 stars</span>
+          <span class="stat-label">Google rating</span>
+        </div>
+        <div class="stat reveal" style="--d:.24s">
+          <span class="stat-num" data-count="2" aria-hidden="true">2</span>
+          <span class="visually-hidden">2</span>
+          <span class="stat-label">Expert barbers</span>
+        </div>
+      </div>
+    </section>
+
     <section class="booking container" id="booking" aria-labelledby="booking-title">
       <h2 id="booking-title" class="section-title reveal">Book your cut</h2>
 
@@ -75,6 +95,8 @@
   <footer class="footer reveal">
     <p>&copy; <span id="year"></span> Blain Hair · Demo site – no real bookings are made.</p>
   </footer>
+
+  <a id="sticky-book" class="btn btn-light sticky-book" href="#booking">Book now</a>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script src="script.js"></script>
