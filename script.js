@@ -1,5 +1,27 @@
 "use strict";
 
+// ================================================================================
+// GOOGLE REVIEWS BAR: the cards that scroll across the site
+//
+// ⚠️  PLACEHOLDER REVIEWS: every name and quote below is MADE UP for design purposes.
+//     They are NOT real Google reviews. Replace them with real ones before launch.
+//
+// To swap in real reviews, edit this one array (keep it to roughly 6 to 8 entries):
+//   name: first name + last initial, e.g. "Harry F."
+//   text: the quote. Keep it short (about 2 lines); longer text is cut off with "…".
+// ================================================================================
+const REVIEWS = [
+  { name: "Jake M.",   text: "Best fade I've had in years. Sharp, clean and out the door on time." },
+  { name: "Tom R.",    text: "Really friendly shop and a proper attention to detail. Booked again before I left." },
+  { name: "Ollie P.",  text: "Easy to book online and the cut was spot on. Highly recommend." },
+  { name: "Sam W.",    text: "Great beard trim, great chat. Wouldn't go anywhere else now." },
+  { name: "Daniel K.", text: "Spotless shop, relaxed atmosphere and a brilliant skin fade." },
+  { name: "Ryan B.",   text: "Took my son for his first proper cut and he loved it. Patient and professional." },
+  { name: "Liam H.",   text: "Consistent every time. Always leave looking sharp." },
+  { name: "Josh T.",   text: "Quick, clean and worth every penny. Five stars from me." },
+];
+// ================================================================================
+
 // ---- Supabase config --------------------------------------------------------
 // Paste your Project URL and anon public key (Supabase → Project Settings → API).
 // Leave both empty to run in demo mode (bookings are kept in memory only).
@@ -681,6 +703,110 @@ function observe(el) {
     nums.forEach(run);
   }, { threshold: 0.4 });
   io.observe(section);
+})();
+
+// ---- Google reviews bar (marquee) --------------------------------------------
+// Renders REVIEWS (top of this file) into a slow, endless sideways scroll. The list is
+// drawn twice so the loop is seamless. It pauses on hover (mouse) or touch, and with
+// "reduce motion" switched on it becomes a plain swipeable row instead.
+(function () {
+  const marquee = $("reviews-marquee");
+  const track = $("reviews-track");
+  if (!marquee || !track || !REVIEWS.length) return;
+
+  const SPEED = 32; // pixels per second: slow and smooth
+  const G_PATHS = [
+    ["#EA4335", "M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"],
+    ["#4285F4", "M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"],
+    ["#FBBC05", "M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"],
+    ["#34A853", "M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"],
+  ];
+  const NS = "http://www.w3.org/2000/svg";
+
+  function googleG() {
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "g-icon");
+    svg.setAttribute("viewBox", "0 0 48 48");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Google");
+    G_PATHS.forEach(([fill, d]) => {
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("fill", fill);
+      p.setAttribute("d", d);
+      svg.appendChild(p);
+    });
+    return svg;
+  }
+
+  function card(r, isClone) {
+    const li = document.createElement("li");
+    li.className = "review";
+    if (isClone) li.setAttribute("aria-hidden", "true"); // the repeat is for the loop only
+
+    const top = document.createElement("div");
+    top.className = "review-top";
+    const stars = document.createElement("span");
+    stars.className = "stars";
+    stars.setAttribute("role", "img");
+    stars.setAttribute("aria-label", "5 out of 5 stars");
+    stars.textContent = "★★★★★";
+    top.append(stars, googleG());
+
+    const text = document.createElement("p");
+    text.className = "review-text";
+    text.textContent = `“${r.text}”`;
+
+    const name = document.createElement("p");
+    name.className = "review-name";
+    name.textContent = r.name;
+
+    li.append(top, text, name);
+    return li;
+  }
+
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  function render() {
+    const still = reduced.matches;
+    track.replaceChildren(...REVIEWS.map((r) => card(r, false)));
+    marquee.classList.toggle("is-static", still);
+    marquee.classList.remove("is-paused");
+    if (still) {
+      marquee.tabIndex = 0; // keyboard users can scroll the row
+      marquee.setAttribute("aria-label", "Customer reviews from Google (scroll sideways)");
+      return;
+    }
+    marquee.removeAttribute("tabindex");
+    marquee.setAttribute("aria-label", "Customer reviews from Google");
+    REVIEWS.forEach((r) => track.appendChild(card(r, true)));
+    // one full set takes (its width / SPEED) seconds to pass
+    const oneSet = track.getBoundingClientRect().width / 2;
+    track.style.setProperty("--marquee-duration", `${Math.max(20, oneSet / SPEED).toFixed(1)}s`);
+  }
+
+  // Touch: holding or tapping pauses; it carries on 3 seconds after the finger lifts.
+  // (Mouse pausing is done in CSS with :hover.)
+  let resumeTimer;
+  marquee.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse") return;
+    clearTimeout(resumeTimer);
+    marquee.classList.add("is-paused");
+  });
+  const letGo = (e) => {
+    if (e.pointerType === "mouse") return;
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => marquee.classList.remove("is-paused"), 3000);
+  };
+  marquee.addEventListener("pointerup", letGo);
+  marquee.addEventListener("pointercancel", letGo);
+
+  let resizeTimer;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(render, 200);
+  });
+  reduced.addEventListener("change", render);
+  render();
 })();
 
 // ---- Sticky "Book now" button -----------------------------------------------
