@@ -302,15 +302,26 @@ async function submitBooking(event) {
   $("form-error").hidden = true;
 
   try {
+    // The token is generated here (the site can't read rows back, by design) and
+    // sent with the insert. It is a random UUID and becomes the cancel link.
+    let token = newToken();
     if (live) {
-      const { error } = await sb.from("bookings").insert({
+      const row = {
         barber: selected.name,
         customer_name: name,
         service: SERVICE,
         appointment_time: slotDate(slot).toISOString(),
         customer_phone: phone,
         status: "confirmed",
-      });
+        cancel_token: token,
+      };
+      let { error } = await sb.from("bookings").insert(row);
+      // cancellation.sql not run yet (no cancel_token column): still take the booking
+      if (error && (error.code === "PGRST204" || error.code === "42703")) {
+        delete row.cancel_token;
+        token = null;
+        ({ error } = await sb.from("bookings").insert(row));
+      }
       if (error) {
         // 23505 = unique violation: someone else booked this barber and time first
         if (error.code === "23505") {
@@ -323,15 +334,22 @@ async function submitBooking(event) {
         console.error("Booking failed:", error);
         return formError("Sorry, we couldn't save your booking. Please try again.");
       }
+    } else {
+      demoBookings.set(token, {
+        barber: selected.name,
+        service: SERVICE,
+        appointment_time: slotDate(slot).toISOString(),
+        status: "confirmed",
+      });
     }
-    book(slot, name);
+    book(slot, name, token);
   } finally {
     submit.disabled = false;
     submit.textContent = "Confirm booking";
   }
 }
 
-function book(slot, name) {
+function book(slot, name, token) {
   slot.booked = true;
   hideNotice();
   clearPending();
@@ -344,10 +362,227 @@ function book(slot, name) {
     `<div><h3>Booking confirmed</h3>` +
     `<p>Thanks ${esc(name)}, you're booked with <strong>${selected.name}</strong> on ` +
     `<strong>${fullDayLabel(slot)}</strong>. Price: <strong>£${slot.price}</strong> (pay in shop).</p></div>`;
+  if (token) box.lastElementChild.appendChild(manageBlock(token));
   box.hidden = false;
   // restart the entrance + tick animations on repeat bookings
   box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
   box.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// ---- Manage / cancel a booking ----------------------------------------------
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const demoBookings = new Map(); // demo mode only: token -> booking
+let managed = null;             // { token, booking } currently shown in "My booking"
+
+function newToken() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; // version 4
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function manageUrl(token) {
+  const u = new URL(location.href);
+  u.search = "";
+  u.hash = "";
+  u.searchParams.set("booking", token);
+  return u.toString();
+}
+
+function whenLabel(iso) {
+  const d = new Date(iso);
+  return `${d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} at ` +
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+// Link + code shown on the confirmation screen (built with the DOM, never innerHTML)
+function manageBlock(token) {
+  const url = manageUrl(token);
+  const wrap = document.createElement("div");
+  wrap.className = "manage-link";
+
+  const row = document.createElement("div");
+  row.className = "actions";
+  const link = document.createElement("a");
+  link.className = "btn btn-light btn-sm";
+  link.href = url;
+  link.textContent = "Manage my booking";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "btn btn-ghost btn-sm";
+  copy.textContent = "Copy link";
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      copy.textContent = "Copied ✓";
+    } catch {
+      copy.textContent = "Copy failed";
+    }
+    setTimeout(() => (copy.textContent = "Copy link"), 2000);
+  });
+  row.append(link, copy);
+
+  const note = document.createElement("p");
+  note.className = "note";
+  note.append("Save this link or take a screenshot. It's the only way to change or cancel your booking. Booking code: ");
+  const code = document.createElement("code");
+  code.textContent = token;
+  note.append(code);
+
+  wrap.append(row, note);
+  return wrap;
+}
+
+async function apiGetBooking(token) {
+  if (live) {
+    const { data, error } = await sb.rpc("get_booking", { token });
+    return error ? { error } : { booking: (data && data[0]) || null };
+  }
+  return { booking: demoBookings.get(token) || null };
+}
+
+async function apiCancelBooking(token) {
+  if (live) {
+    const { data, error } = await sb.rpc("cancel_booking", { token });
+    return error ? { error } : { result: data };
+  }
+  const b = demoBookings.get(token);
+  if (!b) return { result: "not_found" };
+  if (b.status === "cancelled") return { result: "already_cancelled" };
+  if (new Date(b.appointment_time) <= new Date()) return { result: "past" };
+  b.status = "cancelled";
+  return { result: "cancelled" };
+}
+
+function showLookupError(msg) {
+  $("booking-card").hidden = true;
+  const e = $("lookup-error");
+  e.textContent = msg;
+  e.hidden = false;
+}
+
+function setManageMessage(msg) {
+  const m = $("manage-message");
+  m.textContent = msg || "";
+  m.hidden = !msg;
+}
+
+function renderManaged() {
+  const { booking } = managed;
+  const cancelled = booking.status === "cancelled";
+  const past = !cancelled && new Date(booking.appointment_time) <= new Date();
+
+  $("m-barber").textContent = booking.barber;
+  $("m-service").textContent = booking.service;
+  $("m-when").textContent = whenLabel(booking.appointment_time);
+  const status = $("m-status");
+  status.textContent = cancelled ? "Cancelled" : past ? "Completed" : "Confirmed";
+  status.dataset.state = cancelled ? "cancelled" : past ? "past" : "confirmed";
+
+  $("cancel-start").hidden = cancelled || past;
+  $("cancel-confirm").hidden = true;
+  $("rebook").hidden = !cancelled;
+  $("booking-card").hidden = false;
+}
+
+async function lookupBooking(raw, { scroll = false } = {}) {
+  $("lookup-error").hidden = true;
+  setManageMessage("");
+  const found = String(raw).match(UUID_RE);
+  if (!found) {
+    showLookupError("That doesn't look like a booking code. Paste the code or the full link from your confirmation.");
+    return;
+  }
+  const token = found[0].toLowerCase();
+  const btn = $("lookup-btn");
+  btn.disabled = true;
+  btn.textContent = "Searching…";
+  try {
+    const { booking, error } = await apiGetBooking(token);
+    if (error) {
+      console.error("Could not look up booking:", error);
+      showLookupError("Sorry, we couldn't look up your booking right now. Please try again.");
+    } else if (!booking) {
+      showLookupError("We couldn't find a booking with that code. Check it and try again.");
+    } else {
+      managed = { token, booking };
+      renderManaged();
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Find booking";
+    if (scroll) $("my-booking").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+async function confirmCancel() {
+  if (!managed) return;
+  const yes = $("cancel-yes");
+  yes.disabled = true;
+  yes.textContent = "Cancelling…";
+  try {
+    const { result, error } = await apiCancelBooking(managed.token);
+    $("cancel-confirm").hidden = true;
+    if (error) {
+      console.error("Cancel failed:", error);
+      $("cancel-start").hidden = false;
+      return setManageMessage("Sorry, we couldn't cancel your booking. Please try again.");
+    }
+    if (result === "cancelled" || result === "already_cancelled") {
+      managed.booking.status = "cancelled";
+      renderManaged();
+      setManageMessage(result === "cancelled"
+        ? "Your booking has been cancelled. That time is free again for other customers."
+        : "This booking was already cancelled.");
+      await releaseSlot(managed.booking);
+    } else if (result === "past") {
+      renderManaged();
+      setManageMessage("This appointment has already passed, so it can't be cancelled.");
+    } else {
+      showLookupError("We couldn't find that booking. Check the code and try again.");
+    }
+  } finally {
+    yes.disabled = false;
+    yes.textContent = "Yes, cancel booking";
+  }
+}
+
+// Make the cancelled slot bookable again straight away in the booking flow
+async function releaseSlot(booking) {
+  if (live) {
+    await refreshTaken();
+  } else {
+    const b = BARBERS.find((x) => x.name.toLowerCase() === String(booking.barber).toLowerCase());
+    const s = b && b.slots.find((x) => slotDate(x).toISOString() === new Date(booking.appointment_time).toISOString());
+    if (s) s.booked = false;
+  }
+  if (selected) renderSlots();
+}
+
+$("lookup-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  lookupBooking($("booking-code").value);
+});
+$("cancel-start").addEventListener("click", () => {
+  $("cancel-start").hidden = true;
+  $("cancel-confirm").hidden = false;
+  setManageMessage("");
+  $("cancel-no").focus();
+});
+$("cancel-no").addEventListener("click", () => {
+  $("cancel-confirm").hidden = true;
+  $("cancel-start").hidden = false;
+  $("cancel-start").focus();
+});
+$("cancel-yes").addEventListener("click", confirmCancel);
+
+// Opened from a "Manage my booking" link: ?booking=TOKEN
+const linkedBooking = new URLSearchParams(location.search).get("booking");
+if (linkedBooking) {
+  $("booking-code").value = linkedBooking;
+  lookupBooking(linkedBooking, { scroll: true });
 }
 
 // ---- Scroll reveal ----------------------------------------------------------
@@ -408,16 +643,19 @@ function observe(el) {
 })();
 
 // ---- Sticky "Book now" button -----------------------------------------------
-// Visible once the hero has scrolled away, hidden while the booking section is on screen.
+// Visible once the hero has scrolled away, hidden while the booking or
+// "My booking" section is on screen.
 (function () {
   const btn = $("sticky-book");
   const hero = $("top");
   const booking = $("booking");
-  if (!btn || !hero || !booking || !("IntersectionObserver" in window)) return;
+  const manage = $("my-booking");
+  if (!btn || !hero || !booking || !manage || !("IntersectionObserver" in window)) return;
 
   let heroPast = false;
   let bookingOnScreen = false;
-  const update = () => btn.classList.toggle("show", heroPast && !bookingOnScreen);
+  let manageOnScreen = false;
+  const update = () => btn.classList.toggle("show", heroPast && !bookingOnScreen && !manageOnScreen);
 
   new IntersectionObserver(([e]) => {
     heroPast = !e.isIntersecting && e.boundingClientRect.top < 0;
@@ -427,6 +665,10 @@ function observe(el) {
     bookingOnScreen = e.isIntersecting;
     update();
   }).observe(booking);
+  new IntersectionObserver(([e]) => {
+    manageOnScreen = e.isIntersecting;
+    update();
+  }).observe(manage);
 })();
 
 // ---- Init -------------------------------------------------------------------

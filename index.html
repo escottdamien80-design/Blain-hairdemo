@@ -90,6 +90,48 @@
 
       <div id="confirmation" class="confirmation" role="status" aria-live="polite" hidden></div>
     </section>
+
+    <section class="manage" id="my-booking" aria-labelledby="manage-title">
+      <div class="container">
+        <h2 id="manage-title" class="section-title section-title-sm reveal">My booking</h2>
+
+        <div class="step">
+          <form id="lookup-form" novalidate>
+            <label class="field-label" for="booking-code">Booking code or link</label>
+            <div class="lookup-row">
+              <input id="booking-code" type="text" inputmode="text" autocomplete="off" autocapitalize="off"
+                     spellcheck="false" placeholder="Paste your booking code or link">
+              <button id="lookup-btn" class="btn btn-light" type="submit">Find booking</button>
+            </div>
+            <p id="lookup-error" class="form-error" role="alert" hidden></p>
+          </form>
+
+          <div id="booking-card" class="booking-card" hidden>
+            <dl class="details">
+              <div><dt>Barber</dt><dd id="m-barber"></dd></div>
+              <div><dt>Service</dt><dd id="m-service"></dd></div>
+              <div><dt>When</dt><dd id="m-when"></dd></div>
+              <div><dt>Status</dt><dd><span id="m-status" class="status"></span></dd></div>
+            </dl>
+
+            <div class="actions" id="manage-actions">
+              <button id="cancel-start" class="btn btn-ghost" type="button">Cancel booking</button>
+              <a id="rebook" class="btn btn-light" href="#booking" hidden>Book another time</a>
+            </div>
+
+            <div id="cancel-confirm" class="confirm-box" role="group" aria-labelledby="confirm-title" hidden>
+              <p id="confirm-title"><strong>Are you sure?</strong> Your slot will be released for other customers.</p>
+              <div class="actions">
+                <button id="cancel-yes" class="btn btn-light" type="button">Yes, cancel booking</button>
+                <button id="cancel-no" class="btn btn-ghost" type="button">Keep booking</button>
+              </div>
+            </div>
+
+            <p id="manage-message" class="manage-message" role="status" aria-live="polite" hidden></p>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="footer reveal">
