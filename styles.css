@@ -126,6 +126,8 @@ body {
               box-shadow 0.3s var(--ease), opacity 0.3s;
 }
 .btn-sm { padding: 10px 20px; font-size: 0.98rem; border-radius: 10px; }
+.btn-xs { padding: 6px 14px; font-size: 0.88rem; line-height: 1.3; border-radius: 8px; }
+.btn-text { background: transparent; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 .btn-light { background: #fff; color: #111; }
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -136,6 +138,7 @@ body {
 }
 
 @media (hover: hover) {
+  .btn-text:hover { color: #fff; }
   .btn-light:hover:not(:disabled) {
     background: #f4f2f0;
     transform: translateY(-3px);
@@ -545,16 +548,14 @@ body {
 }
 .confirmation p { margin: 0; color: var(--text); }
 .confirmation .note { margin: 14px 0 0; font-size: 0.95rem; color: var(--muted); }
+.confirmation .lead { margin: 14px 0 0; color: var(--text); }
 .manage-link { margin-top: 22px; }
+.manage-link .hint { margin: 0 0 12px; font-size: 0.92rem; color: var(--muted); }
 .manage-link .actions { margin-top: 0; }
-.manage-link .note { margin: 14px 0 0; font-size: 0.92rem; color: var(--muted); }
-.manage-link code {
-  display: block;
-  margin-top: 6px;
-  font: 0.85rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color: #fff;
-  word-break: break-all;
-}
+/* backup link under the "we've emailed you" message: small and secondary */
+.manage-link.backup { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.manage-link.backup .hint { margin-bottom: 10px; font-size: 0.88rem; }
+.manage-link.backup .actions { gap: 8px; align-items: center; }
 .confirmation strong { color: #fff; }
 
 .tick { flex: none; width: 56px; height: 56px; }
@@ -613,7 +614,8 @@ body {
   .footer { padding-bottom: 96px; }
   .fields { grid-template-columns: 1fr; }
   .lookup-row { flex-direction: column; }
-  .manage-link .actions .btn-light { flex-basis: 100%; }
+  .manage-link:not(.backup) .actions .btn-light { flex-basis: 100%; }
+  .manage-link.backup .actions .btn { flex: 0 0 auto; }
   .manage { padding-bottom: 112px; }
   .actions .btn { flex: 1; }
   .confirmation { flex-direction: column; gap: 16px; padding: 26px 22px; border-radius: 22px; }

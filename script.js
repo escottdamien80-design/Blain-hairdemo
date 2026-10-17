@@ -378,24 +378,32 @@ function book(slot, name, token, email) {
     `<div><h3>Booking confirmed</h3>` +
     `<p>Thanks ${esc(name)}, you're booked with <strong>${selected.name}</strong> on ` +
     `<strong>${fullDayLabel(slot)}</strong>. Price: <strong>£${slot.price}</strong> (pay in shop).</p></div>`;
-  if (live && email) {
-    const mail = document.createElement("p");
-    mail.className = "note";
-    const to = document.createElement("strong");
-    to.textContent = email;
-    mail.append("A confirmation email is on its way to ", to, ". Check your spam folder if it doesn't show up.");
-    box.lastElementChild.appendChild(mail);
-  }
-  if (token) {
-    box.lastElementChild.appendChild(manageBlock(token));
+  const emailed = live && Boolean(email); // the confirmation email is sent by the database trigger
+  const extra = box.lastElementChild;
+  if (token && emailed) {
+    // Main message: the email has the link. The on-screen link is only a backup.
+    const lead = document.createElement("p");
+    lead.className = "lead";
+    lead.textContent = "We've emailed you a confirmation with a link to manage or cancel your booking.";
+    extra.appendChild(lead);
+    extra.appendChild(manageBlock(token, { backup: true }));
+  } else if (token) {
+    // No email will arrive (demo mode, or the email column isn't live yet): the link is the only copy
+    extra.appendChild(manageBlock(token, { backup: false }));
   } else if (live) {
     // saved, but without a cancel token (see the console warning in submitBooking)
+    if (emailed) {
+      const mail = document.createElement("p");
+      mail.className = "note";
+      mail.textContent = "A confirmation email is on its way to you.";
+      extra.appendChild(mail);
+    }
     const note = document.createElement("p");
     note.className = "note";
     note.textContent =
       "Your booking is saved, but we couldn't create a link to manage it just now. " +
       "To change or cancel it, please contact the shop.";
-    box.lastElementChild.appendChild(note);
+    extra.appendChild(note);
   }
   box.hidden = false;
   // restart the entrance + tick animations on repeat bookings
@@ -432,20 +440,26 @@ function whenLabel(iso) {
 }
 
 // Link + code shown on the confirmation screen (built with the DOM, never innerHTML)
-function manageBlock(token) {
+function manageBlock(token, { backup }) {
   const url = manageUrl(token);
   const wrap = document.createElement("div");
-  wrap.className = "manage-link";
+  wrap.className = "manage-link" + (backup ? " backup" : "");
+
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent = backup
+    ? "Didn't get the email? You can also manage your booking here."
+    : "Save this link or take a screenshot. It's the only way to change or cancel your booking.";
 
   const row = document.createElement("div");
   row.className = "actions";
   const link = document.createElement("a");
-  link.className = "btn btn-light btn-sm";
+  link.className = backup ? "btn btn-ghost btn-xs" : "btn btn-light btn-sm";
   link.href = url;
   link.textContent = "Manage my booking";
   const copy = document.createElement("button");
   copy.type = "button";
-  copy.className = "btn btn-ghost btn-sm";
+  copy.className = backup ? "btn btn-text btn-xs" : "btn btn-ghost btn-sm";
   copy.textContent = "Copy link";
   copy.addEventListener("click", async () => {
     try {
@@ -458,14 +472,7 @@ function manageBlock(token) {
   });
   row.append(link, copy);
 
-  const note = document.createElement("p");
-  note.className = "note";
-  note.append("Save this link or take a screenshot. It's the only way to change or cancel your booking. Booking code: ");
-  const code = document.createElement("code");
-  code.textContent = token;
-  note.append(code);
-
-  wrap.append(row, note);
+  wrap.append(hint, row);
   return wrap;
 }
 
