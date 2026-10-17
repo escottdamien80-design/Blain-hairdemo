@@ -290,9 +290,13 @@ async function submitBooking(event) {
   if (!pending) return;
   const name = $("customer-name").value.trim();
   const phone = $("customer-phone").value.trim();
+  const email = $("customer-email").value.trim();
 
   if (name.length < 2) return formError("Please enter your name.");
   if (!/^\+?[\d\s()-]{7,20}$/.test(phone)) return formError("Please enter a valid phone number.");
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return formError("Please enter a valid email address.");
+  }
   if (configured && !live) return formError("Booking is unavailable right now. Please try again later.");
 
   const { slot } = pending;
@@ -305,6 +309,7 @@ async function submitBooking(event) {
     // The token is generated here (the site can't read rows back, by design) and
     // sent with the insert. It is a random UUID and becomes the cancel link.
     let token = newToken();
+    let emailSaved = true;
     if (live) {
       const row = {
         barber: selected.name,
@@ -312,14 +317,25 @@ async function submitBooking(event) {
         service: SERVICE,
         appointment_time: slotDate(slot).toISOString(),
         customer_phone: phone,
+        customer_email: email,
         status: "confirmed",
         cancel_token: token,
       };
       let { error } = await sb.from("bookings").insert(row);
-      // cancellation.sql not run yet (no cancel_token column): still take the booking
-      if (error && (error.code === "PGRST204" || error.code === "42703")) {
-        delete row.cancel_token;
-        token = null;
+      // The API doesn't know one of the optional columns (the SQL for it hasn't been run
+      // yet, or the schema cache is stale). Drop just that column and retry, so the booking
+      // is always saved, and say so loudly in the console.
+      for (let i = 0; i < 2 && error && (error.code === "PGRST204" || error.code === "42703"); i++) {
+        const missing = (/'(\w+)' column/.exec(error.message || "") || /column "(\w+)"/.exec(error.message || "") || [])[1];
+        if (missing !== "cancel_token" && missing !== "customer_email") break;
+        console.warn(
+          `Booking saved WITHOUT ${missing}: the insert failed because the API doesn't know that column. ` +
+          "Run the matching file in supabase/ (cancellation.sql or emails.sql) and then: notify pgrst, 'reload schema';",
+          error
+        );
+        delete row[missing];
+        if (missing === "cancel_token") token = null;
+        if (missing === "customer_email") emailSaved = false;
         ({ error } = await sb.from("bookings").insert(row));
       }
       if (error) {
@@ -342,14 +358,14 @@ async function submitBooking(event) {
         status: "confirmed",
       });
     }
-    book(slot, name, token);
+    book(slot, name, token, emailSaved ? email : null);
   } finally {
     submit.disabled = false;
     submit.textContent = "Confirm booking";
   }
 }
 
-function book(slot, name, token) {
+function book(slot, name, token, email) {
   slot.booked = true;
   hideNotice();
   clearPending();
@@ -362,7 +378,25 @@ function book(slot, name, token) {
     `<div><h3>Booking confirmed</h3>` +
     `<p>Thanks ${esc(name)}, you're booked with <strong>${selected.name}</strong> on ` +
     `<strong>${fullDayLabel(slot)}</strong>. Price: <strong>£${slot.price}</strong> (pay in shop).</p></div>`;
-  if (token) box.lastElementChild.appendChild(manageBlock(token));
+  if (live && email) {
+    const mail = document.createElement("p");
+    mail.className = "note";
+    const to = document.createElement("strong");
+    to.textContent = email;
+    mail.append("A confirmation email is on its way to ", to, ". Check your spam folder if it doesn't show up.");
+    box.lastElementChild.appendChild(mail);
+  }
+  if (token) {
+    box.lastElementChild.appendChild(manageBlock(token));
+  } else if (live) {
+    // saved, but without a cancel token (see the console warning in submitBooking)
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent =
+      "Your booking is saved, but we couldn't create a link to manage it just now. " +
+      "To change or cancel it, please contact the shop.";
+    box.lastElementChild.appendChild(note);
+  }
   box.hidden = false;
   // restart the entrance + tick animations on repeat bookings
   box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
