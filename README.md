@@ -11,4 +11,4 @@ Single-page barber booking site: `index.html`, `styles.css`, `script.js` (plus `
 
 ## Booking confirmation emails
 
-Customers enter an email on the booking form and get a "Booking confirmed" email (with a Manage my booking link) and a "Booking cancelled" email, sent through Resend. The Resend key lives only in Supabase secrets, never in the site. Setup is dashboard-only: see [`supabase/EMAILS_SETUP.md`](supabase/EMAILS_SETUP.md). Files: `supabase/emails.sql` (database) and `supabase/functions/booking-emails/index.ts` (the function).
+Customers enter an email on the booking form and get a "Booking confirmed" email (with a Manage my booking link) and a "Booking cancelled" email, sent through Resend. The Resend key lives only in Supabase secrets, never in the site. Setup is dashboard-only: see [`supabase/EMAILS_SETUP.md`](supabase/EMAILS_SETUP.md). Files: `supabase/emails.sql` (database), `supabase/functions/booking-emails/index.ts` (the function) and `supabase/email_trigger.sql` (the database trigger that calls it).

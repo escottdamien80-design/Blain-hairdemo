@@ -1,7 +1,7 @@
 # Booking confirmation emails: setup (Supabase dashboard only, no command line)
 
 You'll set up four things: **Resend** (sends the emails), **a database change**, **a function**
-(builds and sends the email) and **a webhook** (tells the function when a booking is made or cancelled).
+(builds and sends the email) and **a database trigger** (tells the function when a booking is made or cancelled).
 Allow about 20 minutes. Do the steps in order.
 
 > **Read this first: the testing limit.** Until you verify your own domain in Resend, emails sent from
@@ -36,7 +36,7 @@ Never paste this key into the website or into GitHub. It only goes into Supabase
 5. Click **Deploy function**. Wait for "Deployed".
 6. Open the function → **Details** tab → switch **Verify JWT** to **OFF** → **Save changes**.
    (Why: the function is protected by your own secret instead, set up in Steps 4 and 5. Without this the
-   webhook can fail with "401 Invalid JWT".)
+   trigger's request can fail with "401 Invalid JWT".)
 
 ## Step 4: Add the secrets
 
@@ -56,19 +56,25 @@ and copy the long result. **Keep a copy: you need the same value again in Step 5
 `SITE_URL` is the address people type to open your booking site. The "Manage my booking" button in the
 email is built from it (`SITE_URL` + `?booking=` + the customer's code).
 
-## Step 5: Create the webhook
+## Step 5: Connect the database to the function (a SQL trigger)
 
-1. In Supabase, open **Database** → **Webhooks** (in newer dashboards: **Integrations** → **Database Webhooks**).
-   If you see an **Enable webhooks** button, click it first.
-2. Click **Create a new hook** and fill it in:
-   - **Name:** `booking-emails`
-   - **Table:** `public.bookings`
-   - **Events:** tick **Insert** and **Update** (leave Delete unticked)
-   - **Type of webhook:** **Supabase Edge Functions**
-   - **Edge Function:** `booking-emails`, **Method:** `POST`
-   - **HTTP Headers:** click **Add a new header**: name `x-webhook-secret`, value = the **same** `WEBHOOK_SECRET`
-     you made in Step 4. Leave the other headers as they are.
-3. Click **Create webhook**.
+This replaces the "Database Webhooks" form (that form needs a `supabase_functions` schema that some projects
+don't have, and fails with *"schema supabase_functions does not exist"*). Do **not** also create a dashboard
+webhook, or every email would be sent twice.
+
+1. Make sure **pg_net** is on: **Database → Extensions**, search `pg_net`, switch it on.
+2. Find your **project reference**: **Project Settings** (gear icon, bottom of the left menu) → **General** →
+   **Reference ID** (20 letters and numbers). It's also the first part of your Project URL, which is shown under
+   **Project Settings → API → Project URL** (`https://<reference>.supabase.co`), and when you press the
+   **Connect** button at the top of the dashboard.
+3. Open `supabase/email_trigger.sql`, copy it into **SQL Editor → New query**, and change the two lines marked
+   `▼ EDIT ▼`:
+   - `YOUR-PROJECT-REF` → your Reference ID from the previous step
+   - `PASTE-YOUR-WEBHOOK-SECRET-HERE` → the **same** `WEBHOOK_SECRET` value you saved in Step 4
+4. Click **Run**. "Success. No rows returned" means it worked. If you see *"Almost there: fill in your project
+   reference and your webhook secret…"*, one of the two lines is still unedited: fix it and run again.
+
+If you ever change `WEBHOOK_SECRET` in Step 4, edit the same value in this script and run it again.
 
 ## Step 6: Put the new booking form live
 
@@ -88,16 +94,16 @@ Look at the function's logs first: **Edge Functions → booking-emails → Logs*
 
 | What you see | What it means / what to do |
 | --- | --- |
-| Nothing at all in the logs | The webhook isn't firing. Re-check Step 5 (table `public.bookings`, Insert + Update ticked, function chosen). |
-| `401` / `unauthorized` | The `x-webhook-secret` header doesn't match `WEBHOOK_SECRET`. Re-paste both (no spaces). |
+| Nothing at all in the logs | The trigger didn't reach the function. Run the `net._http_response` query below: no rows means the trigger didn't run (re-run `email_trigger.sql` and check it said Success); a row with `error_msg` means the URL is wrong (check the Reference ID). |
+| `401` / `unauthorized` | The secret in `email_trigger.sql` doesn't match the `WEBHOOK_SECRET` Edge Function secret. Re-paste both (no spaces) and run the script again. |
 | `401 Invalid JWT` | Step 3.6: switch **Verify JWT** off. |
 | `WEBHOOK_SECRET is not set` / `RESEND_API_KEY is not set` | A secret is missing or misspelled in Step 4. If you just added it, redeploy the function. |
 | `Resend rejected ... 403 ... You can only send testing emails to your own email address` | Expected until your domain is verified. Book with your Resend sign-up email. |
 | `skipped: booking has no valid customer_email` | The booking had no email (made before this change, or the SQL in Step 2 wasn't run). |
 | `Sent "confirmed" email` but nothing in your inbox | Check spam. In Resend, open **Emails** to see its delivery status. |
 
-To see what the webhook itself received, run this in the SQL Editor:
-`select status_code, content::text, created from net._http_response order by created desc limit 5;`
+To see the answer the function gave the trigger (`status_code` 200 = accepted), run this in the SQL Editor:
+`select status_code, content::text, error_msg, created from net._http_response order by created desc limit 5;`
 
 ## Later: send to real customers
 
@@ -110,6 +116,7 @@ To see what the webhook itself received, run this in the SQL Editor:
 
 - The function only emails when a booking is **created** or its status **changes to cancelled**. Other
   edits to a booking send nothing.
+- A problem with email never stops a booking or cancellation from being saved: the trigger catches errors.
 - Times in emails are always shown in **UK time** (GMT/BST).
 - Customer emails are private: the website can't read them back, and the cancel lookup doesn't return them.
 - Anyone can type any email address into the booking form, so someone could make a booking that sends a
