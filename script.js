@@ -809,6 +809,53 @@ function observe(el) {
   render();
 })();
 
+// ---- Hero parallax ----------------------------------------------------------
+// The background photo slides down a little as you scroll, so it appears to move slower than
+// the page. Transform only (no layout, no background-attachment: fixed, which breaks on iOS).
+// With "reduce motion" switched on it stays still.
+(function () {
+  const hero = $("top");
+  const bg = hero && hero.querySelector(".hero-bg");
+  if (!bg) return;
+
+  const RATE = 0.3; // 0.3 = the photo moves 30% slower than the page
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let limit = 0;    // stop once the hero has scrolled out of view
+  let queued = false;
+
+  function measure() {
+    limit = hero.offsetHeight * 1.2;
+  }
+  function paint() {
+    queued = false;
+    const y = Math.max(0, window.scrollY); // ignore iOS rubber-banding above the top
+    if (y > limit) return;
+    // never slide further than the 32% of spare photo above the hero
+    const shift = Math.min(y * RATE, hero.offsetHeight * 0.32);
+    bg.style.transform = `translate3d(0, ${shift.toFixed(1)}px, 0)`;
+  }
+  function onScroll() {
+    if (!queued) {
+      queued = true;
+      requestAnimationFrame(paint);
+    }
+  }
+  function sync() {
+    window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("resize", measure);
+    if (reduced.matches) {
+      bg.style.transform = "";
+      return;
+    }
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", measure);
+    paint();
+  }
+  reduced.addEventListener("change", sync);
+  sync();
+})();
+
 // ---- Sticky "Book now" button -----------------------------------------------
 // Visible once the hero has scrolled away, hidden while the booking or
 // "My booking" section is on screen.
