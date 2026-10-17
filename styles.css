@@ -187,6 +187,94 @@ body {
   color: var(--muted);
 }
 
+/* ---------- Google reviews bar ---------- */
+.reviews { padding: 96px 0 0; overflow: hidden; }
+.reviews-head { padding: 0 20px; margin-bottom: 36px; text-align: center; }
+.reviews-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.2rem, 7vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.reviews-rating { margin: 12px 0 0; color: var(--muted); font-size: 1.05rem; }
+.reviews-rating strong { color: var(--ink); font-size: 1.15em; }
+.gold { color: #d6a93f; }
+
+.marquee {
+  /* soft fade at both edges so cards ease in and out */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+  overflow: hidden;
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  animation: marquee var(--marquee-duration, 70s) linear infinite;
+  will-change: transform;
+}
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+/* pause: mouse hover, keyboard focus, or a touch (set by script) */
+.marquee.is-paused .marquee-track,
+.marquee:focus-within .marquee-track { animation-play-state: paused; }
+@media (hover: hover) {
+  .marquee:hover .marquee-track { animation-play-state: paused; }
+  .review:hover { border-color: rgba(255, 255, 255, 0.3); }
+}
+
+.review {
+  flex: none;
+  box-sizing: border-box;
+  width: 300px;
+  margin-right: 16px; /* margin (not gap) keeps the repeat exactly half the track, so the loop has no jump */
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  transition: border-color 0.3s var(--ease);
+}
+.review-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.stars { color: #d6a93f; font-size: 1.05rem; letter-spacing: 0.12em; line-height: 1; }
+.g-icon { width: 18px; height: 18px; flex: none; opacity: 0.9; }
+.review-text {
+  margin: 0 0 14px;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.5;
+  /* at most two lines */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  min-height: 3em;
+}
+.review-name { margin: 0; font-weight: 600; font-size: 0.95rem; color: var(--ink); }
+
+/* reduced motion: no scrolling, just a swipeable row */
+.marquee.is-static {
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+.marquee.is-static .marquee-track { animation: none; transform: none; padding: 4px 20px; }
+.marquee.is-static .review { scroll-snap-align: center; }
+.marquee.is-static:focus-visible { outline-offset: -3px; }
+
+@media (max-width: 560px) {
+  .reviews { padding-top: 64px; }
+  .reviews-head { margin-bottom: 28px; }
+  .review { width: 270px; padding: 20px; }
+}
+
 /* ---------- Sticky "Book now" ---------- */
 .sticky-book {
   position: fixed;
@@ -235,6 +323,13 @@ body {
   background:
     radial-gradient(420px 420px at 22% 22%, rgba(255, 255, 255, 0.07), transparent 70%),
     radial-gradient(520px 520px at 82% 62%, rgba(200, 185, 170, 0.07), transparent 70%);
+  /* feather all four edges so the glow never shows a hard box (it sits behind the reviews cards too) */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent),
+                      linear-gradient(180deg, transparent, #000 200px, #000 calc(100% - 200px), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent),
+              linear-gradient(180deg, transparent, #000 200px, #000 calc(100% - 200px), transparent);
+  mask-composite: intersect;
 }
 
 .section-title {
