@@ -6,6 +6,8 @@
   <title>Blain Hair – Barber Shop</title>
   <meta name="description" content="Blain Hair – sharp cuts, clean lines. Book your barber online.">
   <meta name="theme-color" content="#121111">
+  <link rel="preload" as="image" href="images/hero-tools-1500.webp"
+        imagesrcset="images/hero-tools-800.webp 800w, images/hero-tools-1500.webp 1500w" imagesizes="100vw" fetchpriority="high">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@500;600&family=Spectral:wght@400;500;600&display=swap" rel="stylesheet">
@@ -21,11 +23,25 @@
   </nav>
 
   <header class="hero" id="top">
-    <div class="container">
+    <!-- Background photo. script.js moves it slightly slower than the page when you scroll (parallax). -->
+    <img class="hero-bg" src="images/hero-tools-1500.webp"
+         srcset="images/hero-tools-800.webp 800w, images/hero-tools-1500.webp 1500w" sizes="100vw"
+         width="1500" height="2000" fetchpriority="high" decoding="async"
+         alt="A barber's work station with clippers, scissors, combs and brushes laid out neatly on a steel trolley">
+    <div class="hero-inner container">
       <img class="hero-logo" src="logo.png" alt="Blain Hair" width="770" height="176">
-      <h1>Sharp cuts.<br>Clean lines.</h1>
-      <p class="tagline">Book your appointment in seconds.</p>
-      <a class="btn btn-light" href="#booking">Choose your barber</a>
+      <span class="hero-rule" aria-hidden="true"></span>
+      <!-- HERO WORDING. To swap, replace the <h1> and the tagline below with one of these:
+             A (in use): Sharp tools. Steady hands.
+                         Precision cuts and clean lines from Matty and Alfie. Book your chair in seconds.
+             B:          Precision, down to the last line.
+                         Fades, lines and finishes done properly. Pick your barber and book in seconds.
+             C:          Every detail. Every time.
+                         Matty and Alfie take the time to get it right. Book your chair in seconds.
+           (For a two-line headline wrap each sentence in its own <span>.) -->
+      <h1><span>Sharp tools.</span> <span>Steady hands.</span></h1>
+      <p class="tagline">Precision cuts and clean lines from Matty and Alfie. Book your chair in seconds.</p>
+      <a class="btn btn-hero" href="#booking">Book now <span class="arrow" aria-hidden="true">→</span></a>
     </div>
   </header>
 
