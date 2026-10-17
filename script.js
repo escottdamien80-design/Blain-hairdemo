@@ -316,8 +316,14 @@ async function submitBooking(event) {
         cancel_token: token,
       };
       let { error } = await sb.from("bookings").insert(row);
-      // cancellation.sql not run yet (no cancel_token column): still take the booking
+      // The API doesn't know the cancel_token column (cancellation.sql not run, or the
+      // schema cache is stale): still take the booking, but say so loudly.
       if (error && (error.code === "PGRST204" || error.code === "42703")) {
+        console.warn(
+          "Booking saved WITHOUT a cancel token because the insert with cancel_token failed. " +
+          "Run supabase/cancellation.sql and then: notify pgrst, 'reload schema';",
+          error
+        );
         delete row.cancel_token;
         token = null;
         ({ error } = await sb.from("bookings").insert(row));
@@ -362,7 +368,17 @@ function book(slot, name, token) {
     `<div><h3>Booking confirmed</h3>` +
     `<p>Thanks ${esc(name)}, you're booked with <strong>${selected.name}</strong> on ` +
     `<strong>${fullDayLabel(slot)}</strong>. Price: <strong>£${slot.price}</strong> (pay in shop).</p></div>`;
-  if (token) box.lastElementChild.appendChild(manageBlock(token));
+  if (token) {
+    box.lastElementChild.appendChild(manageBlock(token));
+  } else if (live) {
+    // saved, but without a cancel token (see the console warning in submitBooking)
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent =
+      "Your booking is saved, but we couldn't create a link to manage it just now. " +
+      "To change or cancel it, please contact the shop.";
+    box.lastElementChild.appendChild(note);
+  }
   box.hidden = false;
   // restart the entrance + tick animations on repeat bookings
   box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
