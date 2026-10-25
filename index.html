@@ -22,6 +22,8 @@
         <!-- Customer sign-in is optional. script.js shows these only when Supabase is connected. -->
         <button id="nav-signin" class="nav-link" type="button" hidden>Sign in</button>
         <span id="nav-account" class="nav-account" hidden>
+          <!-- Shown only to admins: script.js asks the database (admin_me) after sign-in. Customers never see it. -->
+          <a id="nav-admin" class="nav-link nav-admin" href="admin.html" hidden>Admin</a>
           <a id="nav-mybookings" class="nav-link" href="#my-bookings">My bookings</a>
           <button id="nav-signout" class="nav-link" type="button">Sign out</button>
         </span>

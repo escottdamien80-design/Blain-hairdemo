@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0e0d0d">
+  <title>Admin – Blain Hair</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Spectral:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="./" aria-label="Blain Hair website"><img src="logo.png" alt="Blain" width="770" height="176"></a>
+    <div class="bar-right">
+      <span id="who" class="who" hidden></span>
+      <a class="bar-link" href="./">Website</a>
+      <button id="signout" class="bar-link" type="button" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Only one of these is visible at a time -->
+    <section id="v-loading" class="panel" data-view>
+      <p id="loading-text" class="state" role="status">Loading…</p>
+    </section>
+
+    <section id="v-signin" class="panel" data-view hidden>
+      <h1>Admin</h1>
+      <p class="lead">Sign in with your admin email. We'll email you a one-time link. No password.</p>
+      <form id="signin-form" novalidate>
+        <label class="label" for="signin-email">Email</label>
+        <input id="signin-email" type="email" autocomplete="email" inputmode="email" maxlength="254" placeholder="you@example.com" required>
+        <p id="signin-msg" class="msg" role="status" aria-live="polite" hidden></p>
+        <button id="signin-submit" class="btn btn-primary btn-block" type="submit">Email me a sign-in link</button>
+      </form>
+    </section>
+
+    <section id="v-denied" class="panel" data-view hidden>
+      <h1>No admin access</h1>
+      <p class="lead">You're signed in as <strong id="denied-email"></strong>, but that email isn't an admin.</p>
+      <p class="lead">If that's the wrong email, sign out and use your admin one.</p>
+      <div class="stack">
+        <button id="denied-signout" class="btn btn-primary btn-block" type="button">Sign out</button>
+        <a class="btn btn-ghost btn-block" href="./">Back to the website</a>
+      </div>
+    </section>
+
+    <section id="v-error" class="panel" data-view hidden>
+      <h1>Something went wrong</h1>
+      <p id="error-text" class="lead" role="alert"></p>
+      <div class="stack">
+        <button id="error-retry" class="btn btn-primary btn-block" type="button">Try again</button>
+        <a class="btn btn-ghost btn-block" href="./">Back to the website</a>
+      </div>
+    </section>
+
+    <section id="v-app" data-view hidden aria-label="Bookings">
+      <div class="daybar">
+        <button id="prev" class="step-btn" type="button" aria-label="Previous day">&#8249;</button>
+        <div class="daypick">
+          <span id="day-label" class="day-label"></span>
+          <span class="day-hint">tap to pick a date</span>
+          <input id="day-input" class="day-input" type="date" aria-label="Pick a date">
+        </div>
+        <button id="next" class="step-btn" type="button" aria-label="Next day">&#8250;</button>
+      </div>
+      <button id="today-btn" class="today-btn" type="button" hidden>Back to today</button>
+
+      <div id="barber-filter" class="chips" role="group" aria-label="Show bookings for"></div>
+
+      <p id="summary" class="summary" role="status" aria-live="polite"></p>
+
+      <div id="list-error" class="banner" role="alert" hidden>
+        <span id="list-error-text"></span>
+        <button id="list-error-retry" class="btn btn-ghost btn-small" type="button">Try again</button>
+      </div>
+
+      <ul id="list" class="list"></ul>
+
+      <p class="updated"><span id="updated"></span> <button id="refresh" class="link-btn" type="button">Refresh</button></p>
+    </section>
+  </main>
+
+  <div id="dock" class="dock" hidden>
+    <div id="toast" class="toast" data-kind="ok" role="status" aria-live="polite" hidden>
+      <span id="toast-text"></span>
+      <button id="toast-close" class="toast-close" type="button" aria-label="Dismiss message">&times;</button>
+    </div>
+    <button id="add-open" class="btn btn-primary btn-block btn-big" type="button">+ Add booking</button>
+  </div>
+
+  <dialog id="add-dialog" class="sheet" aria-labelledby="add-title">
+    <form id="add-form" novalidate>
+      <div class="sheet-head">
+        <h2 id="add-title">Add booking</h2>
+        <button id="add-close" class="sheet-close" type="button" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="field">
+        <span class="label" id="lbl-barber">Barber</span>
+        <div id="add-barbers" class="chips" role="radiogroup" aria-labelledby="lbl-barber"></div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="add-service">Service</label>
+        <select id="add-service"></select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="add-date">Date</label>
+        <div class="date-row">
+          <input id="add-date" type="date" required>
+          <button id="add-today" class="chip" type="button">Today</button>
+          <button id="add-tomorrow" class="chip" type="button">Tomorrow</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label" id="lbl-time">Time <span class="label-note" id="time-note"></span></span>
+        <div id="add-times" class="times" role="radiogroup" aria-labelledby="lbl-time" tabindex="-1"></div>
+        <p id="times-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="add-name">Customer name</label>
+        <input id="add-name" type="text" autocomplete="off" maxlength="80" required>
+      </div>
+      <div class="field">
+        <label class="label" for="add-phone">Phone</label>
+        <input id="add-phone" type="tel" autocomplete="off" maxlength="20" required>
+      </div>
+      <div class="field">
+        <label class="label" for="add-email">Email <span class="label-note">(optional, for the confirmation email)</span></label>
+        <input id="add-email" type="email" autocomplete="off" inputmode="email" maxlength="254">
+      </div>
+
+      <p id="add-error" class="msg msg-error" role="alert" hidden></p>
+
+      <div class="stack">
+        <button id="add-save" class="btn btn-primary btn-block btn-big" type="submit">Save booking</button>
+        <button id="add-cancel" class="btn btn-ghost btn-block" type="button">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+  <script src="admin-logic.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
