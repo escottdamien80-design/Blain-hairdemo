@@ -1,0 +1,13 @@
+{
+  "name": "blain-hair",
+  "private": true,
+  "description": "Tests only. The site itself is plain HTML/CSS/JS with no build step.",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "pg": "^8.13.0",
+    "playwright": "1.63.0"
+  }
+}

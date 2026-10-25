@@ -79,6 +79,7 @@ body {
   text-decoration: none;
   transition: color 0.2s;
 }
+.nav-admin { color: var(--gold); font-weight: 600; }
 .nav-link:hover { color: #fff; text-decoration: underline; text-underline-offset: 5px; }
 .brand { display: block; line-height: 0; transition: opacity 0.3s; }
 .brand:hover { opacity: 0.7; }

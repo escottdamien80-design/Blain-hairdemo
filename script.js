@@ -777,13 +777,31 @@ function applySession(session) {
       accountName = (authSession.user.user_metadata && authSession.user.user_metadata.full_name) || "";
       prefillFromAccount();
       loadMyBookings();
+      checkAdmin();
     }
   } else {
     myBookings = null;
     accountName = "";
+    $("nav-admin").hidden = true;
     $("mb-upcoming").replaceChildren();
     $("mb-past-list").replaceChildren();
     setMbMessage("");
+  }
+}
+
+// Admins (barbers listed in the `admins` table, see supabase/admin.sql) get an "Admin" link.
+// The database decides: admin_me() returns a row only for an admin. Any failure just means no link.
+async function checkAdmin() {
+  const link = $("nav-admin");
+  link.hidden = true;
+  if (!authSession || !sbAuth) return;
+  const userId = authSession.user.id;
+  try {
+    const { data, error } = await sbAuth.rpc("admin_me");
+    if (!authSession || authSession.user.id !== userId) return; // signed out or switched meanwhile
+    link.hidden = Boolean(error) || !(data && data.length);
+  } catch {
+    link.hidden = true;
   }
 }
 
