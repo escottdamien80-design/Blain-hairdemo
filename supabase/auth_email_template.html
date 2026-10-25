@@ -1,0 +1,37 @@
+<!-- Blain Hair: the "Magic Link" email that Supabase sends when a customer clicks "Sign in".
+     Paste this into BOTH of these in the Supabase dashboard (see AUTH_SETUP.md, step 5):
+       Authentication → Email Templates → "Magic link"
+       Authentication → Email Templates → "Confirm sign up"   (used the very first time someone signs in)
+     Subject line to use for both:  Your Blain Hair sign-in link
+     {{ .ConfirmationURL }} is filled in by Supabase: leave it exactly as written. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Your Blain Hair sign-in link</title>
+</head>
+<body style="margin:0;padding:0;background:#0e0d0d;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#0e0d0d;">Tap to sign in to Blain Hair. This link works once and expires soon.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0e0d0d" style="background:#0e0d0d;">
+<tr><td align="center" style="padding:40px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
+    <tr><td align="center" style="padding:0 0 28px 0.5em;font-family:Georgia,'Times New Roman',serif;font-size:22px;letter-spacing:0.5em;color:#ffffff;">BLAIN</td></tr>
+    <tr><td bgcolor="#1b1918" style="background:#1b1918;border:1px solid #2e2b2a;border-radius:20px;padding:36px 32px;font-family:Georgia,'Times New Roman',serif;color:#d6d3d1;font-size:16px;line-height:1.6;">
+      <h1 style="margin:0 0 16px;font-family:'Bebas Neue',Impact,'Arial Narrow',Arial,sans-serif;font-weight:400;font-size:36px;line-height:1.05;letter-spacing:0.03em;text-transform:uppercase;color:#ffffff;">Sign in to Blain Hair</h1>
+      <p style="margin:0 0 26px;">Tap the button below to sign in and see your bookings. No password needed.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#ffffff" style="background:#ffffff;border-radius:12px;">
+        <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 28px;font-family:Georgia,'Times New Roman',serif;font-size:16px;font-weight:bold;color:#111111;text-decoration:none;">Sign in</a>
+      </td></tr></table>
+      <p style="margin:26px 0 0;font-size:14px;color:#a8a29e;">This link only works once and expires soon. If you didn't ask to sign in, you can safely ignore this email: nothing will happen.</p>
+    </td></tr>
+    <tr><td align="center" style="padding:24px 8px 0;font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.5;color:#78716c;">
+      Blain Hair &middot; You're getting this because someone asked to sign in with this email address.
+    </td></tr>
+  </table>
+</td></tr>
+</table>
+</body>
+</html>

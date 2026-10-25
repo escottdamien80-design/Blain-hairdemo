@@ -66,6 +66,20 @@ body {
   align-items: center;
   justify-content: space-between;
 }
+.nav-actions { display: flex; align-items: center; gap: 18px; }
+.nav-account { display: flex; align-items: center; gap: 18px; }
+.nav-link {
+  font: inherit;
+  font-size: 0.98rem;
+  color: var(--text);
+  background: none;
+  border: 0;
+  padding: 8px 2px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-link:hover { color: #fff; text-decoration: underline; text-underline-offset: 5px; }
 .brand { display: block; line-height: 0; transition: opacity 0.3s; }
 .brand:hover { opacity: 0.7; }
 .brand img { height: 22px; width: auto; }
@@ -691,6 +705,87 @@ body {
 .manage-message { margin: 20px 0 0; padding: 16px 18px; border-radius: 14px; background: var(--glass-strong); border: 1px solid var(--line); }
 #manage-actions { margin-top: 0; }
 
+/* ---------- Optional sign-in: dialog and "My bookings" ---------- */
+.auth-dialog {
+  width: min(440px, calc(100% - 32px));
+  padding: 32px 28px 28px;
+  color: var(--ink);
+  background: #1b1918;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 24px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7);
+}
+.auth-dialog::backdrop { background: rgba(8, 7, 7, 0.72); backdrop-filter: blur(6px); }
+.auth-dialog h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 2.4rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.auth-lead { margin: 0 0 22px; color: var(--text); font-size: 1rem; }
+.auth-dialog input {
+  display: block;
+  width: 100%;
+  margin: 8px 0 0;
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.auth-dialog input:focus { outline: none; border-color: #fff; background: rgba(255, 255, 255, 0.08); }
+.auth-msg { margin: 16px 0 0; font-size: 0.98rem; color: var(--text); }
+.auth-msg[data-kind="error"] { color: #fca5a5; }
+.auth-msg[data-kind="ok"] { padding: 14px 16px; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px; background: var(--glass-strong); }
+.auth-dialog .actions { margin-top: 22px; }
+
+.signed-as { margin: 0 0 24px; color: var(--muted); font-size: 0.98rem; }
+.signed-as strong { color: var(--ink); font-weight: 600; word-break: break-all; }
+.mb-heading {
+  margin: 0 0 4px;
+  font-family: var(--font-brand);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.booking-list { margin: 0; padding: 0; list-style: none; }
+.booking-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 20px;
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+}
+.booking-item:first-child { border-top: 0; }
+.bi-main { min-width: 0; }
+.bi-when { margin: 0; font-size: 1.15rem; font-weight: 600; color: var(--ink); }
+.bi-meta { margin: 2px 0 0; color: var(--muted); font-size: 0.98rem; }
+.bi-confirm { flex: 1 1 100%; margin-top: 0; }
+.mb-empty { margin: 8px 0 0; color: var(--text); }
+.mb-empty a { color: var(--ink); text-underline-offset: 3px; }
+.mb-past { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); }
+.mb-past summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.95rem;
+  list-style-position: inside;
+}
+.mb-past summary:hover { color: var(--ink); }
+.booking-list.small { margin-top: 6px; }
+.booking-list.small .booking-item { padding: 12px 0; }
+.booking-list.small .bi-when { font-size: 0.95rem; font-weight: 500; color: var(--text); }
+.booking-list.small .bi-meta { font-size: 0.88rem; }
+.booking-list.small .status { font-size: 0.8rem; padding: 1px 10px; }
+
 /* Confirmation */
 .confirmation {
   display: flex;
@@ -765,6 +860,17 @@ body {
 .footer p { margin: 0; }
 
 @media (max-width: 560px) {
+  .nav-actions, .nav-account { gap: 12px; }
+  .nav-link { font-size: 0.92rem; }
+  body.signed-in .nav .btn { display: none; }
+  .auth-dialog { padding: 26px 20px 22px; border-radius: 20px; }
+  .auth-dialog .actions { flex-direction: column; }
+  .auth-dialog .actions .btn { width: 100%; }
+  .booking-item { align-items: flex-start; }
+  .bi-side { flex: 1 1 100%; }
+  .bi-side .btn { width: 100%; }
+  .bi-confirm .actions { flex-direction: column; }
+  .bi-confirm .actions .btn { width: 100%; }
   .hero { min-height: clamp(520px, 80vh, 680px); padding: 80px 0 96px; }
   .tagline { max-width: 30ch; }
   .hero-logo { width: 170px; margin-bottom: 20px; }

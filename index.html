@@ -18,7 +18,15 @@
   <nav class="nav">
     <div class="nav-inner">
       <a class="brand" href="#top" aria-label="Blain Hair home"><img src="logo.png" alt="Blain" width="770" height="176"></a>
-      <a class="btn btn-light btn-sm" href="#booking">Book now</a>
+      <div class="nav-actions">
+        <!-- Customer sign-in is optional. script.js shows these only when Supabase is connected. -->
+        <button id="nav-signin" class="nav-link" type="button" hidden>Sign in</button>
+        <span id="nav-account" class="nav-account" hidden>
+          <a id="nav-mybookings" class="nav-link" href="#my-bookings">My bookings</a>
+          <button id="nav-signout" class="nav-link" type="button">Sign out</button>
+        </span>
+        <a class="btn btn-light btn-sm" href="#booking">Book now</a>
+      </div>
     </div>
   </nav>
 
@@ -121,6 +129,28 @@
       <div id="confirmation" class="confirmation" role="status" aria-live="polite" hidden></div>
     </section>
 
+    <section class="manage" id="my-bookings" aria-labelledby="mb-title" hidden>
+      <div class="container">
+        <h2 id="mb-title" class="section-title section-title-sm reveal">My bookings</h2>
+
+        <div class="step">
+          <p class="signed-as">Signed in as <strong id="mb-email"></strong></p>
+
+          <h3 class="mb-heading">Upcoming</h3>
+          <ul id="mb-upcoming" class="booking-list"></ul>
+          <p id="mb-empty" class="mb-empty" hidden>No upcoming bookings. <a href="#booking">Book your next cut</a>.</p>
+          <p id="mb-error" class="form-error" role="alert" hidden></p>
+
+          <details id="mb-past" class="mb-past" hidden>
+            <summary id="mb-past-summary">Past bookings</summary>
+            <ul id="mb-past-list" class="booking-list small"></ul>
+          </details>
+
+          <p id="mb-message" class="manage-message" role="status" aria-live="polite" hidden></p>
+        </div>
+      </div>
+    </section>
+
     <section class="manage" id="my-booking" aria-labelledby="manage-title">
       <div class="container">
         <h2 id="manage-title" class="section-title section-title-sm reveal">My booking</h2>
@@ -167,6 +197,20 @@
   <footer class="footer reveal">
     <p>&copy; <span id="year"></span> Blain Hair · Demo site – no real bookings are made.</p>
   </footer>
+
+  <dialog id="signin-dialog" class="auth-dialog" aria-labelledby="signin-title">
+    <h2 id="signin-title">Sign in</h2>
+    <form id="signin-form" novalidate>
+      <p class="auth-lead">We'll email you a one-time sign-in link. No password needed. Signing in is optional: you can always book as a guest.</p>
+      <label class="field-label" for="signin-email">Email</label>
+      <input id="signin-email" type="email" autocomplete="email" inputmode="email" maxlength="254" required placeholder="you@example.com">
+      <p id="signin-msg" class="auth-msg" role="status" aria-live="polite" hidden></p>
+      <div class="actions">
+        <button id="signin-submit" class="btn btn-light" type="submit">Email me a sign-in link</button>
+        <button id="signin-close" class="btn btn-ghost" type="button">Close</button>
+      </div>
+    </form>
+  </dialog>
 
   <a id="sticky-book" class="btn btn-light sticky-book" href="#booking">Book now</a>
 

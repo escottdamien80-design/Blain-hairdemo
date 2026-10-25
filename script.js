@@ -32,8 +32,29 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const SERVICE = "Haircut"; // saved in the `service` column
 
 const configured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
-const sb = configured && window.supabase
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+// Did the visitor just arrive from a sign-in email link? Read this BEFORE the clients start up,
+// because the sign-in client removes the token from the address bar.
+const authHash = new URLSearchParams(location.hash.replace(/^#/, ""));
+const AUTH_RETURNING = authHash.has("access_token");
+const AUTH_LINK_ERROR = authHash.get("error_code") || (authHash.has("error") ? "error" : "");
+
+// Two clients, on purpose:
+//  • sb      = the GUEST client (role "anon", never signed in). Availability, booking as a guest and
+//              the token-based look-up / cancel all use it, so they behave exactly the same whether
+//              or not the customer has signed in.
+//  • sbAuth  = the sign-in client (remembers the session). Used only to sign in and out, to read
+//              "My bookings", and to link a booking to the signed-in customer.
+const supa = configured && window.supabase ? window.supabase : null;
+const sb = supa
+  ? supa.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "blain-guest" },
+    })
+  : null;
+const sbAuth = supa
+  ? supa.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "implicit", storageKey: "blain-auth" },
+    })
   : null;
 const live = Boolean(sb);
 
@@ -284,6 +305,7 @@ function showDetails(slot) {
   $("details-summary").textContent =
     `${selected.name} · ${fullDayLabel(slot)} · £${slot.price}`;
   $("form-error").hidden = true;
+  prefillFromAccount();
   const step = $("details-step");
   step.hidden = false;
   step.style.animation = "none"; void step.offsetWidth; step.style.animation = "";
@@ -343,22 +365,44 @@ async function submitBooking(event) {
         status: "confirmed",
         cancel_token: token,
       };
-      let { error } = await sb.from("bookings").insert(row);
-      // The API doesn't know one of the optional columns (the SQL for it hasn't been run
-      // yet, or the schema cache is stale). Drop just that column and retry, so the booking
-      // is always saved, and say so loudly in the console.
-      for (let i = 0; i < 2 && error && (error.code === "PGRST204" || error.code === "42703"); i++) {
-        const missing = (/'(\w+)' column/.exec(error.message || "") || /column "(\w+)"/.exec(error.message || "") || [])[1];
-        if (missing !== "cancel_token" && missing !== "customer_email") break;
-        console.warn(
-          `Booking saved WITHOUT ${missing}: the insert failed because the API doesn't know that column. ` +
-          "Run the matching file in supabase/ (cancellation.sql or emails.sql) and then: notify pgrst, 'reload schema';",
-          error
-        );
-        delete row[missing];
-        if (missing === "cancel_token") token = null;
-        if (missing === "customer_email") emailSaved = false;
-        ({ error } = await sb.from("bookings").insert(row));
+      // Signed in: book through the signed-in client so the booking is linked to the customer.
+      // Anything else (guests, or a signed-in booking the database refuses) uses the guest client.
+      let client = sb;
+      if (authSession && sbAuth) {
+        row.user_id = authSession.user.id;
+        client = sbAuth;
+      }
+      let error, status;
+      // Up to a few tries: each one can drop ONE thing that isn't available yet, so the booking
+      // is always saved (and the console says what to run in Supabase).
+      for (let attempt = 0; attempt < 5; attempt++) {
+        ({ error, status } = await client.from("bookings").insert(row));
+        if (!error) break;
+
+        // Signed-in booking refused (auth.sql not run yet, or the session expired): book as a guest.
+        if (client === sbAuth && (error.code === "42501" || error.code === "PGRST301" || status === 401 || status === 403)) {
+          console.warn("Signed-in booking was refused, so it was saved as a guest booking. Run supabase/auth.sql in Supabase.", error);
+          client = sb;
+          delete row.user_id;
+          continue;
+        }
+
+        // The API doesn't know one of the optional columns (the SQL for it hasn't been run yet,
+        // or the schema cache is stale). Drop just that column and retry.
+        if (error.code === "PGRST204" || error.code === "42703") {
+          const missing = (/'(\w+)' column/.exec(error.message || "") || /column "(\w+)"/.exec(error.message || "") || [])[1];
+          if ((missing !== "cancel_token" && missing !== "customer_email" && missing !== "user_id") || !(missing in row)) break;
+          console.warn(
+            `Booking saved WITHOUT ${missing}: the insert failed because the API doesn't know that column. ` +
+            "Run the matching file in supabase/ (cancellation.sql, emails.sql or auth.sql) and then: notify pgrst, 'reload schema';",
+            error
+          );
+          delete row[missing];
+          if (missing === "cancel_token") token = null;
+          if (missing === "customer_email") emailSaved = false;
+          continue;
+        }
+        break;
       }
       if (error) {
         // 23505 = unique violation: someone else booked this barber and time first
@@ -431,6 +475,7 @@ function book(slot, name, token, email) {
   // restart the entrance + tick animations on repeat bookings
   box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
   box.scrollIntoView({ behavior: "smooth", block: "center" });
+  if (authSession) loadMyBookings(); // the new booking appears under "My bookings"
 }
 
 // ---- Manage / cancel a booking ----------------------------------------------
@@ -648,6 +693,293 @@ if (linkedBooking) {
   lookupBooking(linkedBooking, { scroll: true });
 }
 
+// ---- Optional customer sign-in (email magic link) -----------------------------
+// Signing in is optional: guests book exactly as before. A signed-in customer gets "My bookings"
+// (upcoming and past, with Cancel) and the booking form pre-filled. No passwords: Supabase emails
+// a one-time link. Which bookings a customer may read is decided by the database (supabase/auth.sql),
+// not by this page.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+let authSession = null;            // the signed-in session, or null for guests
+let myBookings = null;             // the signed-in customer's rows (null = not loaded / failed)
+let accountName = "";              // name from their latest booking, to pre-fill the form
+let scrollToAccount = AUTH_RETURNING; // just arrived from the email link: show My bookings once loaded
+
+function setSigninMsg(text, kind) {
+  const m = $("signin-msg");
+  m.textContent = text || "";
+  m.dataset.kind = kind || "";
+  m.hidden = !text;
+}
+
+function openSignin() {
+  setSigninMsg("");
+  $("signin-submit").textContent = "Email me a sign-in link";
+  if (typeof signinDialog.showModal === "function") signinDialog.showModal();
+  else signinDialog.setAttribute("open", "");
+  $("signin-email").focus();
+}
+function closeSignin() {
+  if (typeof signinDialog.close === "function") signinDialog.close();
+  else signinDialog.removeAttribute("open");
+}
+
+async function sendSigninLink(event) {
+  event.preventDefault();
+  if (!sbAuth) return;
+  const email = $("signin-email").value.trim();
+  if (email.length > 254 || !EMAIL_RE.test(email)) return setSigninMsg("Please enter a valid email address.", "error");
+
+  const btn = $("signin-submit");
+  btn.disabled = true;
+  btn.textContent = "Sending…";
+  setSigninMsg("");
+  let sent = false;
+  try {
+    // Back to this same page after the click. That address must be allowed in Supabase
+    // (Authentication → URL Configuration → Redirect URLs); see supabase/AUTH_SETUP.md.
+    const { error } = await sbAuth.auth.signInWithOtp({ email, options: { emailRedirectTo: signinRedirect() } });
+    if (error) {
+      console.error("Sign-in email failed:", error);
+      const limited = error.status === 429 || /rate limit/i.test(error.message || "");
+      setSigninMsg(
+        limited
+          ? "Too many sign-in emails were requested just now. Please wait a few minutes and try again, or book as a guest."
+          : "Sorry, we couldn't send the sign-in link. Please try again, or book as a guest.",
+        "error"
+      );
+    } else {
+      sent = true;
+      setSigninMsg(`Check your inbox. We've sent a sign-in link to ${email}. It can take a minute to arrive (check spam), and you can open it on any device.`, "ok");
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = sent ? "Send it again" : "Email me a sign-in link";
+  }
+}
+
+function signinRedirect() {
+  // this page, without any ?booking= or #... part
+  return location.protocol.startsWith("http") ? location.origin + location.pathname : undefined;
+}
+
+// Called with the current session (or null) whenever the sign-in state may have changed.
+function applySession(session) {
+  const previous = authSession;
+  authSession = session || null;
+  document.body.classList.toggle("signed-in", Boolean(authSession));
+  $("nav-signin").hidden = Boolean(authSession) || !sbAuth;
+  $("nav-account").hidden = !authSession;
+  $("my-bookings").hidden = !authSession;
+
+  if (authSession) {
+    $("mb-email").textContent = authSession.user.email || "";
+    if (!previous || previous.user.id !== authSession.user.id) {
+      accountName = (authSession.user.user_metadata && authSession.user.user_metadata.full_name) || "";
+      prefillFromAccount();
+      loadMyBookings();
+    }
+  } else {
+    myBookings = null;
+    accountName = "";
+    $("mb-upcoming").replaceChildren();
+    $("mb-past-list").replaceChildren();
+    setMbMessage("");
+  }
+}
+
+function prefillFromAccount() {
+  if (!authSession) return;
+  const email = $("customer-email");
+  const name = $("customer-name");
+  if (!email.value) email.value = authSession.user.email || "";
+  if (!name.value && accountName) name.value = accountName;
+}
+
+function setMbMessage(msg) {
+  const m = $("mb-message");
+  m.textContent = msg || "";
+  m.hidden = !msg;
+}
+
+// The database only returns THIS customer's bookings (row-level security in supabase/auth.sql):
+// their own, plus guest bookings made with their verified email.
+async function loadMyBookings() {
+  if (!authSession || !sbAuth) return;
+  const { data, error } = await sbAuth
+    .from("bookings")
+    .select("barber, service, appointment_time, status, cancel_token, customer_name")
+    .order("appointment_time", { ascending: false })
+    .limit(200);
+  if (!authSession) return; // signed out while loading
+  if (error) {
+    console.error("Could not load My bookings (has supabase/auth.sql been run?):", error);
+    myBookings = null;
+  } else {
+    myBookings = data;
+    const named = data.find((r) => r.customer_name);
+    if (named) accountName = named.customer_name;
+    prefillFromAccount(); // the name may only arrive now
+  }
+  renderMyBookings();
+  if (scrollToAccount) {
+    scrollToAccount = false;
+    setTimeout(() => $("my-bookings").scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+  }
+}
+
+function bookingItem(row, upcoming) {
+  const li = document.createElement("li");
+  li.className = "booking-item";
+
+  const main = document.createElement("div");
+  main.className = "bi-main";
+  const when = document.createElement("p");
+  when.className = "bi-when";
+  when.textContent = whenLabel(row.appointment_time);
+  const meta = document.createElement("p");
+  meta.className = "bi-meta";
+  meta.textContent = `${row.barber} · ${row.service}`;
+  main.append(when, meta);
+  li.appendChild(main);
+
+  const side = document.createElement("div");
+  side.className = "bi-side";
+  if (upcoming && row.cancel_token) {
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn btn-ghost btn-sm";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => askToCancel(li, row, cancel));
+    side.appendChild(cancel);
+  } else if (!upcoming) {
+    const tag = document.createElement("span");
+    tag.className = "status";
+    tag.dataset.state = row.status === "cancelled" ? "cancelled" : "past";
+    tag.textContent = row.status === "cancelled" ? "Cancelled" : "Completed";
+    side.appendChild(tag);
+  }
+  li.appendChild(side);
+  return li;
+}
+
+// "Are you sure?" step, same wording as the My booking (paste a code) section
+function askToCancel(li, row, cancelBtn) {
+  cancelBtn.hidden = true;
+  setMbMessage("");
+  const box = document.createElement("div");
+  box.className = "confirm-box bi-confirm";
+  box.setAttribute("role", "group");
+  const q = document.createElement("p");
+  const strong = document.createElement("strong");
+  strong.textContent = "Are you sure?";
+  q.append(strong, " Your slot will be released for other customers.");
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  const yes = document.createElement("button");
+  yes.type = "button";
+  yes.className = "btn btn-light btn-sm";
+  yes.textContent = "Yes, cancel booking";
+  yes.addEventListener("click", () => cancelMine(row, yes));
+  const no = document.createElement("button");
+  no.type = "button";
+  no.className = "btn btn-ghost btn-sm";
+  no.textContent = "Keep booking";
+  no.addEventListener("click", () => {
+    box.remove();
+    cancelBtn.hidden = false;
+    cancelBtn.focus();
+  });
+  actions.append(yes, no);
+  box.append(q, actions);
+  li.appendChild(box);
+  no.focus();
+}
+
+// Uses the same cancel_booking(token) function as the "Manage my booking" link
+async function cancelMine(row, yes) {
+  yes.disabled = true;
+  yes.textContent = "Cancelling…";
+  const { result, error } = await apiCancelBooking(row.cancel_token);
+  if (error) {
+    console.error("Cancel failed:", error);
+    renderMyBookings();
+    return setMbMessage("Sorry, we couldn't cancel your booking. Please try again.");
+  }
+  if (result === "cancelled" || result === "already_cancelled") {
+    row.status = "cancelled";
+    renderMyBookings();
+    setMbMessage(result === "cancelled"
+      ? "Your booking has been cancelled. That time is free again for other customers."
+      : "This booking was already cancelled.");
+    await releaseSlot(row); // the slot shows as available again in the booking flow
+  } else if (result === "past") {
+    renderMyBookings();
+    setMbMessage("This appointment has already passed, so it can't be cancelled.");
+  } else {
+    setMbMessage("We couldn't find that booking any more.");
+    loadMyBookings();
+  }
+}
+
+function renderMyBookings() {
+  const upList = $("mb-upcoming");
+  const pastList = $("mb-past-list");
+  upList.replaceChildren();
+  pastList.replaceChildren();
+  const err = $("mb-error");
+
+  if (myBookings === null) {
+    err.textContent = "Sorry, we couldn't load your bookings right now. You can still book as a guest.";
+    err.hidden = false;
+    $("mb-empty").hidden = true;
+    $("mb-past").hidden = true;
+    return;
+  }
+  err.hidden = true;
+
+  const now = new Date();
+  const when = (r) => new Date(r.appointment_time).getTime();
+  const upcoming = myBookings.filter((r) => r.status !== "cancelled" && when(r) > now).sort((a, b) => when(a) - when(b));
+  const past = myBookings.filter((r) => !upcoming.includes(r)).sort((a, b) => when(b) - when(a));
+
+  upcoming.forEach((r) => upList.appendChild(bookingItem(r, true)));
+  past.forEach((r) => pastList.appendChild(bookingItem(r, false)));
+  $("mb-empty").hidden = upcoming.length > 0;
+  $("mb-past").hidden = past.length === 0;
+  $("mb-past-summary").textContent = `Past bookings (${past.length})`;
+}
+
+const signinDialog = $("signin-dialog");
+$("nav-signin").addEventListener("click", openSignin);
+$("signin-close").addEventListener("click", closeSignin);
+$("signin-form").addEventListener("submit", sendSigninLink);
+signinDialog.addEventListener("click", (e) => {
+  // a click on the dark backdrop (outside the box) closes it; clicks inside the box do not
+  const r = signinDialog.getBoundingClientRect();
+  const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  if (e.target === signinDialog && outside) closeSignin();
+});
+$("nav-signout").addEventListener("click", async () => {
+  if (sbAuth) await sbAuth.auth.signOut();
+  applySession(null);
+});
+
+function initAuth() {
+  if (!sbAuth) return; // demo mode, or the Supabase library didn't load: no sign-in
+  $("nav-signin").hidden = false;
+  if (AUTH_LINK_ERROR) {
+    // an old or already-used link: reopen the sign-in box so they can ask for a fresh one
+    history.replaceState(null, "", location.pathname + location.search);
+    openSignin();
+    setSigninMsg("That sign-in link has expired or was already used. Enter your email to get a new one.", "error");
+  }
+  sbAuth.auth.onAuthStateChange((event, session) => {
+    setTimeout(() => applySession(session), 0); // never call Supabase from inside this callback
+  });
+  sbAuth.auth.getSession().then(({ data }) => applySession(data.session));
+}
+initAuth();
+
 // ---- Scroll reveal ----------------------------------------------------------
 const revealObserver = "IntersectionObserver" in window
   ? new IntersectionObserver((entries) => {
@@ -864,12 +1196,14 @@ function observe(el) {
   const hero = $("top");
   const booking = $("booking");
   const manage = $("my-booking");
+  const mine = $("my-bookings");
   if (!btn || !hero || !booking || !manage || !("IntersectionObserver" in window)) return;
 
   let heroPast = false;
   let bookingOnScreen = false;
   let manageOnScreen = false;
-  const update = () => btn.classList.toggle("show", heroPast && !bookingOnScreen && !manageOnScreen);
+  let mineOnScreen = false;
+  const update = () => btn.classList.toggle("show", heroPast && !bookingOnScreen && !manageOnScreen && !mineOnScreen);
 
   new IntersectionObserver(([e]) => {
     heroPast = !e.isIntersecting && e.boundingClientRect.top < 0;
@@ -883,6 +1217,12 @@ function observe(el) {
     manageOnScreen = e.isIntersecting;
     update();
   }).observe(manage);
+  if (mine) {
+    new IntersectionObserver(([e]) => {
+      mineOnScreen = e.isIntersecting;
+      update();
+    }).observe(mine);
+  }
 })();
 
 // ---- Init -------------------------------------------------------------------
