@@ -702,7 +702,22 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let authSession = null;            // the signed-in session, or null for guests
 let myBookings = null;             // the signed-in customer's rows (null = not loaded / failed)
 let accountName = "";              // name from their latest booking, to pre-fill the form
-let scrollToAccount = AUTH_RETURNING; // just arrived from the email link: show My bookings once loaded
+let justSignedIn = AUTH_RETURNING; // just arrived from the email link: stay at the top and confirm with a small toast
+
+// Arriving from the sign-in email: land at the very top of the page as normal (no jumping to My bookings),
+// with a small "Signed in" toast. My bookings stays one tap away in the menu.
+if (AUTH_RETURNING) {
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  window.scrollTo(0, 0);
+}
+let signedInToastTimer;
+function showSignedInToast() {
+  const t = $("signed-in-toast");
+  if (!t) return;
+  t.hidden = false;
+  clearTimeout(signedInToastTimer);
+  signedInToastTimer = setTimeout(() => (t.hidden = true), 4000);
+}
 
 function setSigninMsg(text, kind) {
   const m = $("signin-msg");
@@ -772,6 +787,11 @@ function applySession(session) {
   $("my-bookings").hidden = !authSession;
 
   if (authSession) {
+    if (justSignedIn) {
+      justSignedIn = false;
+      window.scrollTo(0, 0);
+      showSignedInToast();
+    }
     $("mb-email").textContent = authSession.user.email || "";
     if (!previous || previous.user.id !== authSession.user.id) {
       accountName = (authSession.user.user_metadata && authSession.user.user_metadata.full_name) || "";
@@ -839,10 +859,6 @@ async function loadMyBookings() {
     prefillFromAccount(); // the name may only arrive now
   }
   renderMyBookings();
-  if (scrollToAccount) {
-    scrollToAccount = false;
-    setTimeout(() => $("my-bookings").scrollIntoView({ behavior: "smooth", block: "start" }), 250);
-  }
 }
 
 function bookingItem(row, upcoming) {

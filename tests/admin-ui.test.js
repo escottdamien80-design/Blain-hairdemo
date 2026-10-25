@@ -857,3 +857,40 @@ test("a long customer name and email don't break the card layout", async () => {
     assert.ok((await page.evaluate(() => Math.max(document.documentElement.scrollWidth - 360, window.innerWidth - 360, window.visualViewport.scale < 0.999 ? 1 : 0))) <= 0);
   } finally { await page.context().close(); }
 });
+
+// ================================================================ arriving from the sign-in email link
+const linkPath = (u) => `/index.html#access_token=tok-${u.id}&refresh_token=ref-${u.id}&expires_in=3600&token_type=bearer&type=magiclink`;
+for (const [who, user, isAdmin] of [["a customer", USERS.cust, false], ["an admin", USERS.matty, true]]) {
+  test(`after the sign-in link, ${who} lands at the top of the homepage with a small 'Signed in' toast, no jump to My bookings`, async () => {
+    const backend = makeBackend();
+    const page = await openPage(env, backend, { path: linkPath(user), viewport: { width: 390, height: 844 } });
+    try {
+      await page.locator("#nav-account").waitFor({ state: "visible" });
+      await page.locator("#signed-in-toast").waitFor({ state: "visible" });
+      assert.equal(await page.textContent("#signed-in-toast"), "Signed in");
+      await page.waitForTimeout(1500); // long enough for any delayed auto-scroll to have happened
+      assert.equal(await page.evaluate(() => window.scrollY), 0, "still at the very top");
+      assert.equal(await page.locator(".hero").isVisible(), true);
+      assert.ok(await page.evaluate(() => document.querySelector(".hero").getBoundingClientRect().top >= 0), "hero is on screen");
+      assert.ok(await page.evaluate(() => document.getElementById("my-bookings").getBoundingClientRect().top > window.innerHeight), "My bookings is below the fold");
+      assert.equal(await page.locator("#nav-mybookings").isVisible(), true, "reachable from the nav");
+      assert.equal(await page.locator("#nav-admin").isVisible(), isAdmin);
+      assert.ok(await page.evaluate(() => !location.hash.includes("access_token")), "token removed from the address bar");
+      await page.locator("#signed-in-toast").waitFor({ state: "hidden", timeout: 6000 });
+      assert.equal(await page.evaluate(() => window.scrollY), 0);
+      assert.deepEqual(page.errors, []);
+    } finally { await page.context().close(); }
+  });
+}
+
+test("a normal visit while already signed in shows no 'Signed in' toast, and the nav link still reaches My bookings", async () => {
+  const backend = makeBackend();
+  const page = await openPage(env, backend, { path: "/index.html", signedInAs: USERS.cust, viewport: { width: 1280, height: 800 } });
+  try {
+    await page.locator("#nav-account").waitFor({ state: "visible" });
+    await page.waitForTimeout(500);
+    assert.equal(await page.locator("#signed-in-toast").isVisible(), false);
+    await page.click("#nav-mybookings");
+    await page.waitForFunction(() => document.getElementById("my-bookings").getBoundingClientRect().top < 200);
+  } finally { await page.context().close(); }
+});
