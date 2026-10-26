@@ -25,7 +25,7 @@ Keep **Confirm email** switched ON (AUTH_SETUP step 3): admin access only counts
 - Bookings by day (today first, previous/next day, date picker), filter by barber. Times are UK time.
 - Cancel any upcoming booking ("Are you sure?"). This uses the existing `cancel_booking`, so the slot frees up and the cancellation email goes out as usual.
 - Add a booking for a phone or walk-in customer: barber, service, date, a free time, name, phone, optional email. It uses the same one-active-booking-per-barber-per-time rule as online bookings, and sends the confirmation email if an email is given.
-- The times offered are 09:00 to 18:00 every 30 minutes (constants at the top of `admin-logic.js`; setting working days and hours is a later part).
+- The times offered follow each barber's working hours, breaks, days off and extra hours (part 2, below). Until a barber has hours saved, 09:00 to 18:00 every 30 minutes.
 
 ## Security
 
@@ -34,3 +34,7 @@ Everything is decided in the database: the admins table has no access from the w
 ## Tests
 
 `npm install` then `npm test`. The SQL tests start a throwaway Postgres 16 (needs PostgreSQL binaries) and load the real `supabase/*.sql` files; the browser tests use Playwright's Chromium with a fake Supabase API.
+
+## Part 2: working hours, days off and the week view
+
+Set each barber's weekly hours (with an optional break), block days or hours off, open extra hours, and see the whole week at a glance. Setup is one more SQL file: follow **`HOURS_SETUP.md`** (beginner steps). After that the admin page has **Day**, **Week** and **Hours** tabs.

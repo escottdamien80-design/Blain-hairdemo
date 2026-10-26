@@ -48,8 +48,8 @@ test("formatting: times in UK time, friendly day names", () => {
   assert.equal(L.formatDay("2027-01-04", "2026-10-25"), "Mon 4 Jan 2027");
 });
 
-test("the slot grid runs 09:00 to 18:00 every 30 minutes", () => {
-  const g = L.slotGrid();
+test("with no hours saved the grid is the old one: 09:00 to 18:00 every 30 minutes", () => {
+  const g = L.openStarts("2026-10-26", [], []).map(L.fromMin);
   assert.equal(g[0], "09:00");
   assert.equal(g.at(-1), "18:00");
   assert.equal(g.length, 19);

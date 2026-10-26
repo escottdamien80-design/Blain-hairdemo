@@ -625,6 +625,60 @@ body {
   100% { transform: scale(1.03); }
 }
 
+
+/* Times: one day at a time, as compact chips (working hours give many more times than before) */
+.day-chips {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 22px;
+  padding-bottom: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.day-chips::-webkit-scrollbar { display: none; }
+.day-chip {
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 600;
+  min-height: 48px;
+  padding: 0 20px;
+  color: var(--ink);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.day-chip[aria-pressed="true"] { background: #fff; color: #111; border-color: #fff; }
+.day-chip.full { color: var(--muted); }
+.day-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 14px; }
+.day-price { font-family: var(--font-body); font-size: 0.95rem; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); }
+.slot-list { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+.slot { padding: 0; border: 0; border-radius: 12px; background: none; }
+.slot:not(.taken):hover { transform: none; background: none; border-color: transparent; box-shadow: none; }
+.slot-btn {
+  margin: 0;
+  width: 100%;
+  min-height: 52px;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+@media (hover: hover) {
+  .slot-btn:hover:not(:disabled) { background: var(--glass-strong); border-color: rgba(255, 255, 255, 0.4); }
+}
+.slot.taken { opacity: 0.45; }
+.slot.taken .slot-btn { background: transparent; text-decoration: line-through; }
+.slot.selected { background: none; animation: none; }
+.slot.selected .slot-btn { background: #fff; color: #111; border-color: #fff; }
+.slot.highlight { border-color: transparent; }
+
 /* Notices, loading and details form */
 .notice {
   margin: 0 0 20px;

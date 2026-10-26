@@ -59,83 +59,47 @@ const sbAuth = supa
 const live = Boolean(sb);
 
 // ---- Shop schedule ------------------------------------------------------------
-// Each slot: day offset from today, 24h time, price in £.
-// `booked` only matters in demo mode; with Supabase it comes from the database.
+// Which times can be booked is decided by the database (supabase/hours.sql, function bookable_slots):
+// each barber's weekly hours, breaks, days off and extra hours, minus what is already booked.
+// All times are UK time. Until that is set up (and in demo mode) the page falls back to the original
+// 09:00–18:00 grid, every 30 minutes.
+const BOOKING_DAYS = 7; // how many days ahead customers can book
 const BARBERS = [
-  {
-    id: "matty",
-    name: "Matty",
-    role: "Barber",
-    slots: [
-      { day: 0, time: "10:00", price: 28, booked: true },
-      { day: 0, time: "11:00", price: 28, booked: true },
-      { day: 0, time: "15:30", price: 28, booked: false },
-      { day: 0, time: "17:00", price: 32, booked: false },
-      { day: 1, time: "09:30", price: 28, booked: true },
-      { day: 1, time: "11:00", price: 28, booked: false },
-      { day: 1, time: "13:30", price: 28, booked: false },
-      { day: 1, time: "16:00", price: 32, booked: false },
-      { day: 2, time: "10:00", price: 28, booked: false },
-      { day: 2, time: "12:00", price: 28, booked: false },
-      { day: 2, time: "14:30", price: 28, booked: true },
-      { day: 2, time: "17:30", price: 32, booked: false },
-    ],
-  },
-  {
-    id: "alfie",
-    name: "Alfie",
-    role: "Barber",
-    slots: [
-      { day: 0, time: "09:00", price: 25, booked: true },
-      { day: 0, time: "12:30", price: 25, booked: false },
-      { day: 0, time: "16:00", price: 30, booked: false },
-      { day: 1, time: "10:00", price: 25, booked: true },
-      { day: 1, time: "12:00", price: 25, booked: true },
-      { day: 1, time: "15:00", price: 25, booked: false },
-      { day: 1, time: "18:00", price: 30, booked: false },
-      { day: 2, time: "09:30", price: 25, booked: false },
-      { day: 2, time: "11:30", price: 25, booked: false },
-      { day: 2, time: "13:00", price: 25, booked: true },
-      { day: 2, time: "16:30", price: 30, booked: false },
-    ],
-  },
+  { id: "matty", name: "Matty", role: "Barber", price: 28, slots: [] },
+  { id: "alfie", name: "Alfie", role: "Barber", price: 25, slots: [] },
 ];
+// Dates, times and the fallback grid come from admin-logic.js (a plain helper file, loaded before this one)
+const SHOP = window.AdminLogic;
 
 // ---- Helpers ----------------------------------------------------------------
 const $ = (id) => document.getElementById(id);
 
-function slotDate(slot) {
-  const d = new Date();
-  d.setDate(d.getDate() + slot.day);
-  const [h, m] = slot.time.split(":").map(Number);
-  d.setHours(h, m, 0, 0);
-  return d;
+const longDay = new Intl.DateTimeFormat("en-GB", { timeZone: SHOP.TZ, weekday: "long", day: "numeric", month: "long" });
+
+// slot = { iso, date: "YYYY-MM-DD" (UK), time: "HH:MM" (UK), free, price }
+function makeSlot(iso, free, barber) {
+  return { iso, date: SHOP.dateOfInstant(iso), time: SHOP.formatTime(iso), free, price: barber.price };
 }
 
 function isAvailable(slot) {
-  return !slot.booked && slotDate(slot) > new Date();
+  return slot.free && new Date(slot.iso).getTime() > Date.now();
 }
 
-function dayLabel(offset) {
-  if (offset === 0) return "Today";
-  if (offset === 1) return "Tomorrow";
-  return slotDate({ day: offset, time: "00:00" }).toLocaleDateString("en-GB", {
-    weekday: "long", day: "numeric", month: "short",
-  });
+function dayChipLabel(date) {
+  const today = SHOP.todayStr();
+  if (date === today) return "Today";
+  if (date === SHOP.addDays(today, 1)) return "Tomorrow";
+  return SHOP.plainDay(date);
 }
 
 function fullDayLabel(slot) {
-  const d = slotDate(slot);
-  const date = d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-  return `${date} at ${slot.time}`;
+  return `${longDay.format(new Date(slot.iso))} at ${slot.time}`;
 }
 
 // ---- State & rendering -------------------------------------------------------
-let selected = null; // chosen barber
-let pending = null;  // { slot, el } while the customer is filling in their details
-
-// Live mode: forget the dummy "booked" flags; the database is the source of truth
-if (live) BARBERS.forEach((b) => b.slots.forEach((s) => (s.booked = false)));
+let selected = null;    // chosen barber
+let pending = null;     // { slot, el } while the customer is filling in their details
+let selectedDay = null; // the day whose times are showing
 
 function esc(str) {
   const d = document.createElement("div");
@@ -150,30 +114,55 @@ function showNotice(msg) {
 }
 function hideNotice() { $("notice").hidden = true; }
 
-// ---- Availability from Supabase ---------------------------------------------
-// Reads the `taken_slots` view (barber + appointment_time only) so customer
-// names and phone numbers are never exposed to the browser.
-async function refreshTaken() {
-  if (!live) return true;
-  const { data, error } = await sb
-    .from("taken_slots")
-    .select("barber, appointment_time")
-    .gte("appointment_time", new Date().toISOString());
-  if (error) {
-    console.error("Could not load bookings:", error);
-    showNotice("Couldn't check live availability. A slot that's already taken will be rejected when you confirm.");
-    return false;
+// ---- Available times -----------------------------------------------------------
+// Demo mode (no Supabase) and the "hours.sql not run yet" fallback use the original grid.
+const demoTaken = new Set(); // demo mode only: "barber|time" that have been booked on this page
+
+function fallbackSlots(barber, takenKeys) {
+  const out = [];
+  const today = SHOP.todayStr();
+  for (let i = 0; i < BOOKING_DAYS; i++) {
+    const date = SHOP.addDays(today, i);
+    SHOP.openStarts(date, [], []).forEach((m, idx) => {
+      const iso = SHOP.londonToUtc(date, SHOP.fromMin(m)).toISOString();
+      if (new Date(iso).getTime() <= Date.now()) return;
+      const demoBusy = !live && (idx + i) % 5 === (barber.id === "alfie" ? 1 : 3); // demo mode: a few pretend-booked times
+      const key = `${barber.name.toLowerCase()}|${new Date(iso).getTime()}`;
+      out.push(makeSlot(iso, !(takenKeys.has(key) || demoBusy), barber));
+    });
   }
-  hideNotice();
-  const taken = new Set(
-    data.map((r) => `${String(r.barber).toLowerCase()}|${new Date(r.appointment_time).getTime()}`)
-  );
-  BARBERS.forEach((b) =>
-    b.slots.forEach((s) => {
-      s.booked = taken.has(`${b.name.toLowerCase()}|${slotDate(s).getTime()}`);
-    })
-  );
-  return true;
+  return out;
+}
+
+// Loads the times for one barber. Returns false if they couldn't be checked.
+async function loadSlots(barber) {
+  if (!live) {
+    barber.slots = fallbackSlots(barber, demoTaken);
+    return true;
+  }
+  const { data, error } = await sb.rpc("bookable_slots", { p_barber: barber.name, p_from: SHOP.todayStr(), p_days: BOOKING_DAYS });
+  if (!error) {
+    hideNotice();
+    barber.slots = (data || []).map((r) => makeSlot(new Date(r.slot_time).toISOString(), r.free, barber));
+    return true;
+  }
+  // The hours SQL hasn't been run yet: use the original grid and the taken_slots view, as before
+  if (error.code === "PGRST202" || error.code === "42883" || error.status === 404) {
+    const { data: rows, error: takenError } = await sb
+      .from("taken_slots")
+      .select("barber, appointment_time")
+      .gte("appointment_time", new Date().toISOString());
+    if (!takenError) {
+      hideNotice();
+      const taken = new Set(rows.map((r) => `${String(r.barber).toLowerCase()}|${new Date(r.appointment_time).getTime()}`));
+      barber.slots = fallbackSlots(barber, taken);
+      return true;
+    }
+  }
+  console.error("Could not load available times:", error);
+  showNotice("Couldn't check live availability. A slot that's already taken will be rejected when you confirm.");
+  barber.slots = barber.slots.length ? barber.slots : fallbackSlots(barber, new Set());
+  return false;
 }
 
 function renderBarbers() {
@@ -198,6 +187,7 @@ function renderBarbers() {
 
 async function selectBarber(barber) {
   selected = barber;
+  selectedDay = null;
   clearPending();
   document.querySelectorAll(".barber").forEach((el) =>
     el.setAttribute("aria-checked", String(el.id === `barber-${barber.id}`))
@@ -210,7 +200,7 @@ async function selectBarber(barber) {
   if (live) $("slots").innerHTML = '<p class="loading">Checking availability…</p>';
   if (wasHidden) step.scrollIntoView({ behavior: "smooth", block: "start" });
 
-  await refreshTaken();
+  await loadSlots(barber);
   if (selected === barber) renderSlots(); // ignore if they switched barber meanwhile
 }
 
@@ -218,24 +208,54 @@ function renderSlots() {
   const container = $("slots");
   container.innerHTML = "";
 
-  const days = [...new Set(selected.slots.map((s) => s.day))].sort((a, b) => a - b);
-  days.forEach((day) => {
-    const section = document.createElement("div");
-    section.className = "day";
-    const title = document.createElement("h4");
-    title.className = "day-title";
-    title.textContent = dayLabel(day);
-    const list = document.createElement("div");
-    list.className = "slot-list";
+  const days = [...new Set(selected.slots.map((s) => s.date))].sort();
+  if (!days.length) {
+    const none = document.createElement("p");
+    none.className = "loading";
+    none.textContent = `${selected.name} has no times available in the next ${BOOKING_DAYS} days. Please try the other barber.`;
+    container.appendChild(none);
+    $("next-available").disabled = true;
+    return;
+  }
+  const hasFree = (d) => selected.slots.some((s) => s.date === d && isAvailable(s));
+  if (!selectedDay || !days.includes(selectedDay)) selectedDay = days.find(hasFree) || days[0];
 
-    selected.slots
-      .filter((s) => s.day === day)
-      .sort((a, b) => a.time.localeCompare(b.time))
-      .forEach((slot, i) => list.appendChild(slotEl(slot, i)));
-
-    section.append(title, list);
-    container.appendChild(section);
+  // one chip per day that has times, then that day's times
+  const chips = document.createElement("div");
+  chips.className = "day-chips";
+  chips.setAttribute("role", "group");
+  chips.setAttribute("aria-label", "Choose a day");
+  days.forEach((d) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "day-chip" + (hasFree(d) ? "" : " full");
+    chip.dataset.date = d;
+    chip.setAttribute("aria-pressed", String(d === selectedDay));
+    chip.textContent = dayChipLabel(d);
+    chip.addEventListener("click", () => {
+      selectedDay = d;
+      renderSlots();
+    });
+    chips.appendChild(chip);
   });
+  container.appendChild(chips);
+
+  const title = document.createElement("h4");
+  title.className = "day-title";
+  title.textContent = longDay.format(new Date(SHOP.londonToUtc(selectedDay, "12:00")));
+  const price = document.createElement("span");
+  price.className = "day-price";
+  price.textContent = `£${selected.price} · pay in shop`;
+  title.appendChild(price);
+  container.appendChild(title);
+
+  const list = document.createElement("div");
+  list.className = "slot-list";
+  selected.slots
+    .filter((s) => s.date === selectedDay)
+    .sort((a, b) => a.iso.localeCompare(b.iso))
+    .forEach((slot, i) => list.appendChild(slotEl(slot, i)));
+  container.appendChild(list);
 
   $("next-available").disabled = !nextAvailable(selected);
 }
@@ -245,37 +265,35 @@ function slotEl(slot, i = 0) {
   const el = document.createElement("div");
   el.className = "slot" + (free ? "" : " taken");
   el.style.setProperty("--i", Math.min(i, 10));
-  el.dataset.day = slot.day;
+  el.dataset.iso = slot.iso;
   el.dataset.time = slot.time;
-  el.innerHTML =
-    `<span class="slot-time">${slot.time}</span>` +
-    `<span class="slot-price">£${slot.price}</span>`;
 
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "slot-btn";
-  btn.textContent = free ? "Book" : "Unavailable";
+  btn.textContent = slot.time;
   btn.disabled = !free;
+  btn.setAttribute("aria-label", `${slot.time}${free ? "" : ", unavailable"}`);
   btn.addEventListener("click", () => selectSlot(slot, el));
   el.appendChild(btn);
 
-  if (pending && pending.slot === slot && free) markSelected(el);
+  if (pending && pending.slot.iso === slot.iso && free) markSelected(el);
   return el;
 }
 
 function nextAvailable(barber) {
-  return barber.slots
-    .filter(isAvailable)
-    .sort((a, b) => slotDate(a) - slotDate(b))[0];
+  return barber.slots.filter(isAvailable).sort((a, b) => a.iso.localeCompare(b.iso))[0];
 }
 
 function jumpToNext() {
   if (!selected) return;
   const slot = nextAvailable(selected);
   if (!slot) return;
-  const el = document.querySelector(
-    `.slot[data-day="${slot.day}"][data-time="${slot.time}"]`
-  );
+  if (selectedDay !== slot.date) {
+    selectedDay = slot.date;
+    renderSlots();
+  }
+  const el = document.querySelector(`.slot[data-iso="${slot.iso}"]`);
   if (!el) return;
   document.querySelectorAll(".slot.highlight").forEach((n) => n.classList.remove("highlight"));
   el.classList.add("highlight");
@@ -286,14 +304,14 @@ function jumpToNext() {
 // ---- Choosing a slot and booking it -------------------------------------------
 function markSelected(el) {
   el.classList.add("selected");
-  el.querySelector(".slot-btn").textContent = "Selected ✓";
+  el.querySelector(".slot-btn").setAttribute("aria-pressed", "true");
 }
 
 function selectSlot(slot, el) {
   document.querySelectorAll(".slot.highlight").forEach((n) => n.classList.remove("highlight"));
   document.querySelectorAll(".slot.selected").forEach((n) => {
     n.classList.remove("selected");
-    n.querySelector(".slot-btn").textContent = "Book";
+    n.querySelector(".slot-btn").removeAttribute("aria-pressed");
   });
   pending = { slot, el };
   markSelected(el);
@@ -319,7 +337,7 @@ function clearPending() {
   $("details-form").reset();
   document.querySelectorAll(".slot.selected").forEach((n) => {
     n.classList.remove("selected");
-    n.querySelector(".slot-btn").textContent = "Book";
+    n.querySelector(".slot-btn").removeAttribute("aria-pressed");
   });
 }
 
@@ -359,7 +377,7 @@ async function submitBooking(event) {
         barber: selected.name,
         customer_name: name,
         service: SERVICE,
-        appointment_time: slotDate(slot).toISOString(),
+        appointment_time: slot.iso,
         customer_phone: phone,
         customer_email: email,
         status: "confirmed",
@@ -405,12 +423,16 @@ async function submitBooking(event) {
         break;
       }
       if (error) {
-        // 23505 = unique violation: someone else booked this barber and time first
-        if (error.code === "23505") {
+        // 23505 = unique violation: someone else booked this barber and time first.
+        // slot_not_available = the barber's hours or a block changed since this page loaded.
+        const closed = /slot_not_available/.test(error.message || "");
+        if (error.code === "23505" || closed) {
           clearPending();
-          await refreshTaken();
+          await loadSlots(selected);
           renderSlots();
-          showNotice("Sorry, that time was just taken. Please choose another slot.");
+          showNotice(closed
+            ? "Sorry, that time isn't available any more. Please choose another slot."
+            : "Sorry, that time was just taken. Please choose another slot.");
           return;
         }
         console.error("Booking failed:", error);
@@ -420,9 +442,10 @@ async function submitBooking(event) {
       demoBookings.set(token, {
         barber: selected.name,
         service: SERVICE,
-        appointment_time: slotDate(slot).toISOString(),
+        appointment_time: slot.iso,
         status: "confirmed",
       });
+      demoTaken.add(`${selected.name.toLowerCase()}|${new Date(slot.iso).getTime()}`);
     }
     book(slot, name, token, emailSaved ? email : null);
   } finally {
@@ -432,7 +455,7 @@ async function submitBooking(event) {
 }
 
 function book(slot, name, token, email) {
-  slot.booked = true;
+  slot.free = false;
   hideNotice();
   clearPending();
   renderSlots();
@@ -659,12 +682,11 @@ async function confirmCancel() {
 
 // Make the cancelled slot bookable again straight away in the booking flow
 async function releaseSlot(booking) {
-  if (live) {
-    await refreshTaken();
-  } else {
-    const b = BARBERS.find((x) => x.name.toLowerCase() === String(booking.barber).toLowerCase());
-    const s = b && b.slots.find((x) => slotDate(x).toISOString() === new Date(booking.appointment_time).toISOString());
-    if (s) s.booked = false;
+  if (!live) {
+    demoTaken.delete(`${String(booking.barber).toLowerCase()}|${new Date(booking.appointment_time).getTime()}`);
+    BARBERS.forEach((b) => { if (b.slots.length) b.slots = fallbackSlots(b, demoTaken); });
+  } else if (selected) {
+    await loadSlots(selected);
   }
   if (selected) renderSlots();
 }
@@ -1269,6 +1291,4 @@ document.querySelectorAll(".reveal").forEach((el) => { if (!el.classList.contain
 
 if (configured && !live) {
   showNotice("Booking is unavailable right now (couldn't load the booking service).");
-} else {
-  refreshTaken(); // warm up so the first barber click is instant
 }
