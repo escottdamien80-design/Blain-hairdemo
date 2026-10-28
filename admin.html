@@ -58,6 +58,13 @@
     </section>
 
     <section id="v-app" data-view hidden aria-label="Bookings">
+      <div class="tabs" role="tablist" aria-label="Admin sections">
+        <button id="tab-day" class="tab" role="tab" aria-selected="true" aria-controls="pane-day" type="button">Day</button>
+        <button id="tab-week" class="tab" role="tab" aria-selected="false" aria-controls="pane-week" type="button">Week</button>
+        <button id="tab-hours" class="tab" role="tab" aria-selected="false" aria-controls="pane-hours" type="button">Hours</button>
+      </div>
+
+      <div id="pane-day" role="tabpanel" aria-labelledby="tab-day">
       <div class="daybar">
         <button id="prev" class="step-btn" type="button" aria-label="Previous day">&#8249;</button>
         <div class="daypick">
@@ -81,6 +88,65 @@
       <ul id="list" class="list"></ul>
 
       <p class="updated"><span id="updated"></span> <button id="refresh" class="link-btn" type="button">Refresh</button></p>
+      </div>
+
+      <!-- Week view: one barber, Monday to Sunday -->
+      <div id="pane-week" role="tabpanel" aria-labelledby="tab-week" hidden>
+        <div class="daybar">
+          <button id="week-prev" class="step-btn" type="button" aria-label="Previous week">&#8249;</button>
+          <div class="daypick"><span id="week-label" class="day-label"></span><span id="week-sub" class="day-hint"></span></div>
+          <button id="week-next" class="step-btn" type="button" aria-label="Next week">&#8250;</button>
+        </div>
+        <button id="week-today" class="today-btn" type="button" hidden>Back to this week</button>
+        <div id="week-barbers" class="chips" role="radiogroup" aria-label="Barber"></div>
+        <div id="week-error" class="banner" role="alert" hidden>
+          <span id="week-error-text"></span>
+          <button id="week-error-retry" class="btn btn-ghost btn-small" type="button">Try again</button>
+        </div>
+        <p id="week-summary" class="summary" role="status" aria-live="polite"></p>
+        <ol id="week-list" class="weeklist"></ol>
+        <ul class="legend" aria-label="Key">
+          <li><i class="key key-work"></i>Working</li>
+          <li><i class="key key-break"></i>Break</li>
+          <li><i class="key key-off"></i>Blocked</li>
+          <li><i class="key key-extra"></i>Extra hours</li>
+          <li><i class="key key-booking"></i>Booking</li>
+        </ul>
+        <p class="updated">Tap a day to open it.</p>
+      </div>
+
+      <!-- Hours: weekly hours, days off and extra hours -->
+      <div id="pane-hours" role="tabpanel" aria-labelledby="tab-hours" hidden>
+        <div id="hours-barbers" class="chips" role="radiogroup" aria-label="Barber"></div>
+        <div id="hours-error" class="banner" role="alert" hidden>
+          <span id="hours-error-text"></span>
+          <button id="hours-error-retry" class="btn btn-ghost btn-small" type="button">Try again</button>
+        </div>
+        <div id="hours-body">
+          <section class="block" aria-labelledby="h-weekly">
+            <h2 id="h-weekly">Weekly hours</h2>
+            <p id="hours-status" class="msg" role="status" aria-live="polite"></p>
+            <div class="quick">
+              <button id="hours-same" class="btn btn-ghost btn-small" type="button">Use Monday's hours Mon–Fri</button>
+              <button id="hours-copy" class="btn btn-ghost btn-small" type="button"></button>
+            </div>
+            <ul id="hours-days" class="hdays"></ul>
+            <div id="hours-warn" class="confirm" role="alert" hidden></div>
+            <p id="hours-problem" class="msg msg-error" role="alert" hidden></p>
+            <button id="hours-save" class="btn btn-primary btn-block btn-big" type="button">Save hours</button>
+          </section>
+
+          <section class="block" aria-labelledby="h-off">
+            <h2 id="h-off">Days off &amp; extra hours</h2>
+            <p class="lead">Block a day or a few hours (holiday, dentist), or open extra hours on one date. Existing bookings are never cancelled.</p>
+            <div class="stack">
+              <button id="ex-open-off" class="btn btn-primary btn-block" type="button">Block time off</button>
+              <button id="ex-open-extra" class="btn btn-ghost btn-block" type="button">Open extra hours</button>
+            </div>
+            <ul id="exc-list" class="exclist"></ul>
+          </section>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -146,8 +212,62 @@
     </form>
   </dialog>
 
+  <dialog id="ex-dialog" class="sheet" aria-labelledby="ex-title">
+    <form id="ex-form" novalidate>
+      <div class="sheet-head">
+        <h2 id="ex-title">Block time off</h2>
+        <button id="ex-close" class="sheet-close" type="button" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="field">
+        <span class="label" id="lbl-ex-barber">Barber</span>
+        <div id="ex-barbers" class="chips" role="radiogroup" aria-labelledby="lbl-ex-barber"></div>
+      </div>
+
+      <div class="field" id="ex-type-field">
+        <span class="label" id="lbl-ex-type">What to block</span>
+        <div id="ex-type" class="chips" role="radiogroup" aria-labelledby="lbl-ex-type">
+          <button class="chip" type="button" role="radio" data-type="days" aria-checked="true">Whole day(s)</button>
+          <button class="chip" type="button" role="radio" data-type="range" aria-checked="false">A few hours</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="ex-from" id="ex-from-label">First day</label>
+        <input id="ex-from" type="date" required>
+      </div>
+      <div class="field" id="ex-to-field">
+        <label class="label" for="ex-to">Last day <span class="label-note">(same as first day for one day)</span></label>
+        <input id="ex-to" type="date" required>
+      </div>
+
+      <div id="ex-times" class="field" hidden>
+        <span class="label">Time</span>
+        <div class="time-pair">
+          <select id="ex-start" aria-label="From"></select>
+          <span class="to">to</span>
+          <select id="ex-end" aria-label="Until"></select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="ex-note">Note <span class="label-note">(optional, e.g. Holiday)</span></label>
+        <input id="ex-note" type="text" maxlength="80" autocomplete="off">
+      </div>
+
+      <p id="ex-error" class="msg msg-error" role="alert" hidden></p>
+      <div id="ex-warn" class="confirm" role="alert" hidden></div>
+
+      <div class="stack" id="ex-actions">
+        <button id="ex-save" class="btn btn-primary btn-block btn-big" type="submit">Save</button>
+        <button id="ex-cancel" class="btn btn-ghost btn-block" type="button">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
   <script src="admin-logic.js"></script>
+  <script src="admin-schedule.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

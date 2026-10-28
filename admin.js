@@ -125,6 +125,7 @@
     S.user = null; S.me = null;
     stopRefresh();
     closeAdd();
+    AdminSchedule.reset();
     showSignin("Your sign-in has expired. Please sign in again.", "error");
   }
 
@@ -164,6 +165,7 @@
   async function signOut() {
     stopRefresh();
     closeAdd();
+    AdminSchedule.reset();
     S.user = null; S.me = null; S.rows = null;
     await call(sb.auth.signOut(), 5000);
     showSignin();
@@ -191,6 +193,7 @@
       S.me = null;
       stopRefresh();
       closeAdd();
+      AdminSchedule.reset();
       return showDenied(session.user.email);
     }
     const first = !S.me;
@@ -222,8 +225,10 @@
     S.confirm = null;
     S.cardError = {};
     text($("who"), S.me.barber_name ? `Hi ${S.me.barber_name}` : "Admin");
+    AdminSchedule.reset();
     showView("app");
     buildFilter();
+    AdminSchedule.start();
     loadDay();
     startRefresh();
   }
@@ -334,6 +339,28 @@
     return n;
   }
 
+  // What the Week / Hours part (admin-schedule.js) shares with this file
+  window.AdminSchedule.init({
+    sb, call, el, text, show, newToken, clearToast,
+    toast: (kind, message) => toast(kind, message),
+    isAuthError, isDefiniteRefusal, timeoutMs,
+    L,
+    me: () => S.me,
+    sessionExpired: () => sessionExpired(),
+    recheckAdmin: () => { closeAdd(); S.me = null; return verifyAdmin({ user: { email: "" } }); },
+    refreshDay: () => loadDay({ keep: true }),
+    dayShown: () => S.date,
+    onScheduleLoaded: () => { if (S.me && AdminSchedule.currentTab() === "day") render(); },
+    // tapping a day in the week view opens it in the Day tab, for that barber
+    goToDay(date, barber) {
+      S.date = date;
+      S.barber = barber || "all";
+      S.confirm = null;
+      AdminSchedule.showTab("day", { silent: true });
+      loadDay();
+    },
+  });
+
   function card(r, now) {
     const state = L.bookingState(r, now);
     const li = el("li", "card");
@@ -368,6 +395,10 @@
       contact.appendChild(el("span", "muted", "No email"));
     }
     li.appendChild(contact);
+
+    // A booking that sits outside working hours or in blocked time is flagged, never changed.
+    const flag = state === "cancelled" ? null : AdminSchedule.flagFor(r);
+    if (flag) li.appendChild(el("p", "flag", flag === "blocked" ? "In blocked time. The booking is still on." : "Outside working hours. The booking is still on."));
 
     if (state === "upcoming" && r.cancel_token) li.appendChild(cancelArea(r));
     return li;
@@ -540,7 +571,7 @@
       }
       show(msg, true);
     } else if (!A.slots.length) {
-      text(msg, A.date === L.todayStr() ? `No free times left today for ${A.barber}. Try another day.` : `No free times for ${A.barber} on this day. Try another day or barber.`);
+      text(msg, A.date === L.todayStr() ? `No free times left today for ${A.barber}. Try another day.` : `No free times for ${A.barber} on this day (day off, blocked or fully booked). Try another day or barber.`);
       msg.dataset.kind = "";
       show(msg, true);
     } else {
@@ -578,11 +609,22 @@
     A.slotsError = "";
     renderAdd();
     if (!L.isDateStr(date)) { A.slotsLoading = false; A.slots = []; return renderAdd(); }
-    const { start, end } = L.dayRange(date);
-    const { data, error } = await call(
-      sb.from("bookings").select("barber, appointment_time, status").gte("appointment_time", start).lt("appointment_time", end)
-    );
+    // One question to the database: which times can be booked? (working hours, breaks, blocks and existing bookings
+    // are all worked out there, so the customer page and this form always agree.)
+    let { data, error } = await call(sb.rpc("bookable_slots", { p_barber: barber, p_from: date, p_days: 1 }));
     if (seq !== A.seq) return;
+    if (error && (error.code === "PGRST202" || error.code === "42883" || error.status === 404)) {
+      // supabase/hours.sql hasn't been run yet: the original 09:00–18:00 grid, minus existing bookings
+      const { start, end } = L.dayRange(date);
+      const old = await call(sb.from("bookings").select("barber, appointment_time, status").gte("appointment_time", start).lt("appointment_time", end));
+      if (seq !== A.seq) return;
+      if (!old.error) {
+        data = L.freeSlots({ date, barber, taken: old.data || [] }).map((s) => ({ slot_time: s.iso, free: true }));
+        error = null;
+      } else {
+        error = old.error;
+      }
+    }
     A.slotsLoading = false;
     if (error) {
       if (isAuthError(error)) return sessionExpired();
@@ -590,7 +632,10 @@
       A.slotsError = error.timeout ? "Slow connection: couldn't check free times." : "Couldn't check free times. Check your connection.";
       return renderAdd();
     }
-    A.slots = L.freeSlots({ date, barber, taken: data || [] });
+    A.slots = (data || [])
+      .filter((r) => r.free)
+      .map((r) => { const iso = new Date(r.slot_time).toISOString(); return { time: L.formatTime(iso), iso }; })
+      .filter((s) => new Date(s.iso).getTime() > Date.now());
     if (A.time && !A.slots.some((s) => s.iso === A.time)) A.time = null;
     renderAdd();
   }
@@ -664,7 +709,7 @@
 
     // a clear answer from the database
     const msg = L.CREATE_TEXT[data] || "Sorry, that didn't save. Please try again.";
-    if (data === "taken" || data === "past" || data === "invalid_time") {
+    if (data === "taken" || data === "past" || data === "invalid_time" || data === "closed") {
       newAttempt();
       refreshSlots(); // show what's really free now
     } else {
@@ -697,6 +742,7 @@
     refreshTimer = setInterval(() => {
       if (document.visibilityState !== "visible" || !S.me || S.busy || dialog.open || S.loading) return;
       loadDay({ keep: true });
+      AdminSchedule.refresh();
     }, REFRESH_MS);
   }
   function stopRefresh() { clearInterval(refreshTimer); refreshTimer = null; }
@@ -704,6 +750,7 @@
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible" || !S.me) return;
     loadDay({ keep: true });                       // coming back to the app: show the latest
+    AdminSchedule.refreshActive();
     sb.auth.getSession().then(({ data }) => { if (data.session) verifyAdmin(data.session, { silent: true }); });
   });
   window.addEventListener("online", () => { if (S.me && S.listError) loadDay({ keep: true }); });

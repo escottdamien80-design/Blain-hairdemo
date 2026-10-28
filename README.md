@@ -20,3 +20,7 @@ Customers can sign in with an emailed magic link (no passwords) to see **My book
 ## Barber admin
 
 Admins (emails in the `admins` table) get an **Admin** link and a phone-friendly page to see bookings by day, cancel, and add phone/walk-in bookings. Setup, including the one line of SQL that makes you an admin: [`supabase/ADMIN_SETUP.md`](supabase/ADMIN_SETUP.md). Files: `admin.html`, `admin.css`, `admin.js`, `admin-logic.js`, `supabase/admin.sql`. Tests: `npm install && npm test`.
+
+## Working hours, days off and the week view (admin part 2)
+
+Each barber has a weekly schedule (with an optional break), plus one-off days off, blocked hours and extra hours, all set from the **Hours** tab of the admin page. The **Week** tab shows a barber's whole week (hours, bookings, blocked time) and each day opens the Day view. The customer booking page, the admin "Add booking" form and "Next available" only offer times inside those hours. Blocking time never cancels existing bookings: you get a warning and they stay. Setup (beginner steps): [`supabase/HOURS_SETUP.md`](supabase/HOURS_SETUP.md). Files: `supabase/hours.sql`, `admin-schedule.js`, `admin-logic.js`.

@@ -39,8 +39,8 @@ async function launch() {
 }
 
 // signedInAs: a user object from backend.users, or null for a signed-out visitor
-async function openPage(env, backend, { path: pagePath = "/admin.html", signedInAs = null, viewport = { width: 390, height: 844 }, timeoutMs = 1500, isMobile = viewport.width < 700, now = NOW } = {}) {
-  const context = await env.browser.newContext({ viewport, isMobile, hasTouch: isMobile, deviceScaleFactor: 2, locale: "en-GB", timezoneId: "Europe/London" });
+async function openPage(env, backend, { path: pagePath = "/admin.html", signedInAs = null, viewport = { width: 390, height: 844 }, timeoutMs = 1500, isMobile = viewport.width < 700, now = NOW, timezoneId = "Europe/London" } = {}) {
+  const context = await env.browser.newContext({ viewport, isMobile, hasTouch: isMobile, deviceScaleFactor: 2, locale: "en-GB", timezoneId });
   await context.route(`https://${SUPABASE_HOST}/**`, (route) => backend.handle(route));
   await context.route("https://cdn.jsdelivr.net/**/supabase.js", (route) => route.fulfill({ path: SUPABASE_JS, contentType: "text/javascript" }));
   await context.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.fulfill({ status: 200, contentType: "text/css", body: "" }));

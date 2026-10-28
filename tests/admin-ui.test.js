@@ -382,9 +382,9 @@ ui("cancel: only one 'Are you sure?' is open at a time, and it survives a list r
   await card(page, "Sam Jones").locator(".btn-danger-ghost").click();
   await page.click("#refresh");
   await page.locator("#refresh", { hasText: "Refresh" }).waitFor();
-  assert.equal(await page.locator(".confirm").count(), 1, "the question is still there after refreshing");
+  assert.equal(await page.locator(".card .confirm").count(), 1, "the question is still there after refreshing");
   await card(page, "Pete Brown").locator(".btn-danger-ghost").click();
-  assert.equal(await page.locator(".confirm").count(), 1, "opening another closes the first");
+  assert.equal(await page.locator(".card .confirm").count(), 1, "opening another closes the first");
   assert.equal(await card(page, "Pete Brown").locator(".confirm").count(), 1);
 });
 
@@ -747,7 +747,7 @@ ui("add booking: closing the form with Cancel or ✕ discards it and saves nothi
 
 ui("add booking: if free times can't be loaded, they're told and can retry", async ({ page, backend }) => {
   await ready(page);
-  backend.once("GET bookings", { mode: "fail-before" });
+  backend.once("bookable_slots", { mode: "fail-before" });
   await page.click("#add-open");
   await page.locator("#times-msg[data-kind=error]").waitFor();
   assert.match(await page.textContent("#times-msg"), /Couldn't check free times/);
@@ -758,7 +758,7 @@ ui("add booking: if free times can't be loaded, they're told and can retry", asy
 ui("add booking: two quick date changes never show the wrong day's times", async ({ page, backend }) => {
   await ready(page);
   await openAdd(page);
-  backend.once("GET bookings", { delay: 600 }); // the first date's answer arrives late
+  backend.once("bookable_slots", { delay: 600 }); // the first date's answer arrives late
   await page.click("#add-tomorrow");
   await page.fill("#add-date", "2026-10-28");
   await page.waitForTimeout(1000);

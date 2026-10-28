@@ -345,6 +345,120 @@ input:focus, select:focus { outline: none; border-color: #fff; background: var(-
 .times .btn { grid-column: 1 / -1; }
 .times:focus { outline: none; }
 
+/* ================= Part 2: tabs, week view, hours ================= */
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 5px; margin-bottom: 16px; background: var(--glass); border: 1px solid var(--line); border-radius: 16px; }
+.tab {
+  position: relative;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  min-height: 52px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab[aria-selected="true"] { background: #fff; color: #111; }
+.tab[data-dirty="true"]::after { content: ""; position: absolute; top: 10px; right: 14px; width: 9px; height: 9px; border-radius: 50%; background: var(--gold); }
+h2 { font-size: 1.7rem; }
+#week-barbers { margin-top: 14px; }
+#hours-barbers { margin: 2px 0 16px; }
+.block { margin-top: 28px; padding-top: 4px; }
+.block:first-child { margin-top: 12px; }
+.block .lead { color: var(--muted); font-size: 1rem; }
+.msg[data-kind="warn"] { background: rgba(214, 169, 63, 0.14); border-color: rgba(214, 169, 63, 0.6); color: #f3dea5; }
+
+/* ---------- week view ---------- */
+.weeklist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.weekhint { padding: 14px 16px; color: #f3dea5; background: rgba(214, 169, 63, 0.12); border: 1px solid rgba(214, 169, 63, 0.5); border-radius: 14px; }
+.wday {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 14px 16px 12px;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.wday:active { background: #1f1c1b; }
+.wday[data-state="today"] { border-color: rgba(214, 169, 63, 0.7); }
+.wday-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.wday-name { font-size: 1.25rem; font-weight: 600; color: var(--ink); }
+.wday-count { color: var(--muted); white-space: nowrap; }
+.wday-hours { margin: 2px 0 0; color: var(--text); }
+.wday-hours.is-off { color: var(--muted); }
+.wday-off { margin: 2px 0 0; color: var(--danger-text); font-size: 0.98rem; overflow-wrap: anywhere; }
+.wday-flag { margin: 8px 0 0; padding: 6px 10px; font-size: 0.95rem; color: #f3dea5; background: rgba(214, 169, 63, 0.14); border: 1px solid rgba(214, 169, 63, 0.5); border-radius: 10px; }
+.wbar { position: relative; height: 20px; margin-top: 10px; background: rgba(255, 255, 255, 0.06); border-radius: 6px; overflow: hidden; }
+.seg { position: absolute; top: 0; bottom: 0; }
+.seg.work { background: rgba(255, 255, 255, 0.22); }
+.seg.break { background: repeating-linear-gradient(135deg, #151312 0 4px, #35302d 4px 8px); }
+.seg.extra { background: rgba(214, 169, 63, 0.45); }
+.seg.off { background: repeating-linear-gradient(135deg, rgba(200, 67, 60, 0.85) 0 4px, rgba(120, 36, 32, 0.9) 4px 8px); }
+.seg.booking { top: 4px; bottom: 4px; background: #fff; border-radius: 3px; box-shadow: 0 0 0 1px #0e0d0d; }
+.seg.booking.flagged { background: var(--gold); }
+.waxis { display: flex; justify-content: space-between; margin-top: 3px; font-size: 0.8rem; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 16px 2px 0; padding: 0; font-size: 0.9rem; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.key { display: inline-block; width: 18px; height: 12px; border-radius: 3px; }
+.key-work { background: rgba(255, 255, 255, 0.22); }
+.key-break { background: repeating-linear-gradient(135deg, #151312 0 3px, #35302d 3px 6px); }
+.key-off { background: repeating-linear-gradient(135deg, rgba(200, 67, 60, 0.85) 0 3px, rgba(120, 36, 32, 0.9) 3px 6px); }
+.key-extra { background: rgba(214, 169, 63, 0.45); }
+.key-booking { background: #fff; }
+
+/* ---------- hours editor ---------- */
+.quick { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 4px 0 14px; }
+.hdays { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 10px; }
+.hday { padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.hday[data-working="false"] { opacity: 0.8; }
+.hday-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hday-name { font-size: 1.2rem; font-weight: 600; color: var(--ink); }
+.switch {
+  font: inherit;
+  font-weight: 600;
+  min-width: 118px;
+  min-height: 48px;
+  padding: 0 16px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.switch[aria-checked="true"] { color: #111; background: #fff; border-color: #fff; }
+.hday-body { margin-top: 10px; display: grid; gap: 8px; }
+.time-pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.time-pair .to { color: var(--muted); }
+.time-pair select { padding-left: 14px; }
+.break-row { display: grid; gap: 6px; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); border-radius: 12px; }
+.break-label { font-weight: 600; color: var(--text); }
+.hday .link-btn { justify-self: start; padding-left: 0; }
+.hday-problem { margin-top: 10px; }
+#hours-warn, #ex-warn { margin: 14px 0; }
+.affected { margin: 10px 0 14px; padding: 0 0 0 18px; color: var(--ink); font-size: 0.98rem; }
+.affected li { margin-bottom: 4px; overflow-wrap: anywhere; }
+#hours-save { margin-top: 6px; }
+
+/* ---------- days off / extra hours list ---------- */
+.exclist { list-style: none; margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.exc { padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.exc[data-kind="extra"] { border-color: rgba(214, 169, 63, 0.5); }
+.exc[data-kind="off"] { border-color: rgba(240, 148, 140, 0.4); }
+.exc-text { margin: 0; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.exc-note { margin: 2px 0 10px; color: var(--muted); overflow-wrap: anywhere; }
+.exc .btn { margin-top: 10px; }
+.flag { margin: 10px 0 0; padding: 8px 12px; font-size: 0.98rem; color: #f3dea5; background: rgba(214, 169, 63, 0.14); border: 1px solid rgba(214, 169, 63, 0.5); border-radius: 10px; }
+#ex-type .chip { flex: 1 1 140px; }
+
 @media (min-width: 640px) {
   .sheet { width: 560px; height: auto; max-height: 92vh; margin: auto; border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.7); }
   .times { grid-template-columns: repeat(6, 1fr); }

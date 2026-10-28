@@ -10,7 +10,7 @@ const { Client } = require("pg");
 const BIN = ["/usr/lib/postgresql/16/bin", "/usr/lib/postgresql/15/bin", "/usr/lib/postgresql/17/bin", "/usr/bin"]
   .find((d) => fs.existsSync(path.join(d, "initdb")));
 const ROOT = path.resolve(__dirname, "..", "..");
-const SQL_FILES = ["setup.sql", "cancellation.sql", "emails.sql", "auth.sql", "email_trigger.sql", "admin.sql"];
+const SQL_FILES = ["setup.sql", "cancellation.sql", "emails.sql", "auth.sql", "email_trigger.sql", "admin.sql", "hours.sql"];
 
 // postgres refuses to run as root, so drop to the "postgres" user when needed
 const asPg = (cmd, args) => (process.getuid && process.getuid() === 0 ? ["runuser", ["-u", "postgres", "--", cmd, ...args]] : [cmd, args]);
